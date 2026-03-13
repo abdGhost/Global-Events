@@ -8,6 +8,7 @@ import '../../core/responsive/responsive.dart';
 import '../../core/storage/app_storage.dart';
 import '../../core/theme/app_colors.dart';
 import '../../providers/auth_providers.dart';
+import '../../providers/user_location_provider.dart';
 import '../../providers/onboarding_provider.dart';
 
 class SplashScreen extends ConsumerStatefulWidget {
@@ -25,8 +26,15 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
       if (!mounted) return;
       final token = await AppStorage.getStoredToken();
       final onboardingDone = await AppStorage.getOnboardingCompleted();
+      final storedLocation = await AppStorage.getStoredUserLocation();
       if (!mounted) return;
       ref.read(onboardingCompletedProvider.notifier).state = onboardingDone;
+      if (storedLocation != null) {
+        ref.read(userLocationProvider.notifier).state = (
+          lat: storedLocation.lat,
+          lng: storedLocation.lng,
+        );
+      }
       if (token != null && token.isNotEmpty) {
         ref.read(authTokenProvider.notifier).state = token;
         context.replace('/');

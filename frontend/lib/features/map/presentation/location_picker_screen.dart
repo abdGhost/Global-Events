@@ -8,6 +8,7 @@ import 'dart:convert';
 import '../../../core/responsive/responsive.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../providers/user_location_provider.dart';
+import '../../../core/storage/app_storage.dart';
 
 class LocationPickerScreen extends ConsumerStatefulWidget {
   const LocationPickerScreen({super.key});
@@ -236,6 +237,8 @@ class _LocationPickerScreenState extends ConsumerState<LocationPickerScreen> {
                               final loc =
                                   (lat: _picked!.latitude, lng: _picked!.longitude);
                               ref.read(userLocationProvider.notifier).state = loc;
+                              // Persist picked location for future sessions.
+                              AppStorage.saveUserLocation(loc.lat, loc.lng);
                               Navigator.of(context).pop({
                                 'lat': loc.lat,
                                 'lng': loc.lng,

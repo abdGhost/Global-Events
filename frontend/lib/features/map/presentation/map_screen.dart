@@ -54,8 +54,16 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     final pad = Responsive.horizontalPadding(context);
     final userLocation = ref.watch(userLocationProvider);
     if (userLocation != null) {
-      _center = LatLng(userLocation.lat, userLocation.lng);
+      final target = LatLng(userLocation.lat, userLocation.lng);
+      _center = target;
       _zoom = 11;
+      // Ensure map recenters even if it was already created (eg. when switching tabs).
+      // Ignore errors if the controller is not yet attached.
+      try {
+        _mapController.move(target, _zoom);
+      } catch (_) {
+        // no-op
+      }
     }
 
     final AsyncValue<List<EventListItem>> asyncEvents =
@@ -93,6 +101,10 @@ class _MapScreenState extends ConsumerState<MapScreen> {
           final events = _applyFilter(
             all.where((e) => e.lat != null && e.lng != null).toList(),
           );
+          // When there are no events with coordinates yet, still show the
+          // map and header plus a friendly empty state card instead of a
+          // blank screen.
+          final hasEvents = events.isNotEmpty;
           return Stack(
             children: [
               Positioned.fill(
@@ -187,7 +199,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                   ),
                 ),
               ),
-              // Bottom sheet with events
+              // Bottom sheet with events / empty state
               Align(
                 alignment: Alignment.bottomCenter,
                 child: Container(
@@ -237,7 +249,9 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                                   ?.copyWith(fontWeight: FontWeight.w600),
                             ),
                             Text(
-                              '${events.length} found',
+                              hasEvents
+                                  ? '${events.length} found'
+                                  : 'No events yet',
                               style: Theme.of(context)
                                   .textTheme
                                   .bodySmall
@@ -246,44 +260,55 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                           ],
                         ),
                         SizedBox(height: Responsive.spacing(context, 8)),
-                        _FilterChipsRow(
-                          selectedIndex: _selectedFilterIndex,
-                          onSelected: (index) {
-                            setState(() {
-                              _selectedFilterIndex = index;
-                            });
-                          },
-                        ),
-                        SizedBox(height: Responsive.spacing(context, 8)),
-                        SizedBox(
-                          height: Responsive.value(context, 120),
-                          child: ListView.separated(
-                            scrollDirection: Axis.horizontal,
-                            itemCount: events.length,
-                            separatorBuilder: (_, __) => SizedBox(
-                              width: Responsive.spacing(context, 10),
-                            ),
-                            itemBuilder: (_, i) => _MapEventChip(
-                              item: EventListItem(
-                                id: events[i].id,
-                                title: events[i].title,
-                                startUtc: events[i].startUtc,
-                                endUtc: events[i].endUtc,
-                                timezone: events[i].timezone,
-                                address: events[i].address,
-                                lat: events[i].lat,
-                                lng: events[i].lng,
-                                city: events[i].city,
-                                countryCode: events[i].countryCode,
-                                isVirtual: events[i].isVirtual,
-                                category: events[i].category,
-                                imageUrl: events[i].imageUrl,
-                                rsvpCount: events[i].rsvpCount,
-                                viewsCount: events[i].viewsCount,
+                        if (hasEvents) ...[
+                          _FilterChipsRow(
+                            selectedIndex: _selectedFilterIndex,
+                            onSelected: (index) {
+                              setState(() {
+                                _selectedFilterIndex = index;
+                              });
+                            },
+                          ),
+                          SizedBox(height: Responsive.spacing(context, 8)),
+                          SizedBox(
+                            height: Responsive.value(context, 120),
+                            child: ListView.separated(
+                              scrollDirection: Axis.horizontal,
+                              itemCount: events.length,
+                              separatorBuilder: (_, __) => SizedBox(
+                                width: Responsive.spacing(context, 10),
+                              ),
+                              itemBuilder: (_, i) => _MapEventChip(
+                                item: EventListItem(
+                                  id: events[i].id,
+                                  title: events[i].title,
+                                  startUtc: events[i].startUtc,
+                                  endUtc: events[i].endUtc,
+                                  timezone: events[i].timezone,
+                                  address: events[i].address,
+                                  lat: events[i].lat,
+                                  lng: events[i].lng,
+                                  city: events[i].city,
+                                  countryCode: events[i].countryCode,
+                                  isVirtual: events[i].isVirtual,
+                                  category: events[i].category,
+                                  imageUrl: events[i].imageUrl,
+                                  rsvpCount: events[i].rsvpCount,
+                                  viewsCount: events[i].viewsCount,
+                                ),
                               ),
                             ),
                           ),
-                        ),
+                        ] else ...[
+                          SizedBox(height: Responsive.spacing(context, 8)),
+                          Text(
+                            'Create an event with a location to see it here on the map.',
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodySmall
+                                ?.copyWith(color: Colors.grey.shade600),
+                          ),
+                        ],
                       ],
                     ),
                   ),

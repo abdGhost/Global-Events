@@ -11,25 +11,13 @@ import 'package:go_router/go_router.dart';
 import '../../../core/location/location_service.dart';
 import '../../../core/responsive/responsive.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/storage/app_storage.dart';
 import '../../../models/event.dart';
 import '../../../providers/nearby_events_provider.dart';
 import '../../../providers/trending_events_provider.dart';
 import '../../../providers/user_location_provider.dart';
 import 'widgets/event_card.dart';
 import 'widgets/shimmer_event_card.dart';
-
-const _categories = [
-  'Music',
-  'Tech',
-  'Sports',
-  'Food & Drink',
-  'Networking',
-  'Virtual',
-  'Charity',
-  'Workshops',
-  'Festivals',
-  'Arts',
-];
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -75,6 +63,27 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ),
             ),
           );
+
+    // Derive dynamic categories from currently available events so we only
+    // show categories that actually exist.
+    final categories = trending.maybeWhen(
+      data: (events) {
+        final set = <String>{};
+        for (final e in events) {
+          final c = e.category?.trim();
+          if (c != null && c.isNotEmpty) {
+            set.add(c);
+          }
+        }
+        final list = set.toList()..sort();
+        return list;
+      },
+      orElse: () => <String>[],
+    );
+    final hasCategories = categories.isNotEmpty;
+    final selectedCategoryIndex = hasCategories
+        ? _selectedCategoryIndex.clamp(0, categories.length - 1)
+        : 0;
 
     return Scaffold(
       body: Stack(
@@ -178,17 +187,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     if (events.isEmpty) return const SizedBox.shrink();
 
                     // Apply category filter from chips (home screen).
-                    final selectedCategory = _categories[_selectedCategoryIndex];
-                    final filtered = events
-                        .where(
-                          (e) =>
-                              e.category != null &&
-                              e.category!.toLowerCase() ==
-                                  selectedCategory.toLowerCase(),
-                        )
-                        .toList();
-
-                    final visible = filtered.isEmpty ? events : filtered;
+                    List<EventListItem> visible = events;
+                    if (hasCategories) {
+                      final selectedCategory = categories[selectedCategoryIndex];
+                      final filtered = events
+                          .where(
+                            (e) =>
+                                e.category != null &&
+                                e.category!.toLowerCase() ==
+                                    selectedCategory.toLowerCase(),
+                          )
+                          .toList();
+                      visible = filtered.isEmpty ? events : filtered;
+                    }
 
                     // If there is only a single trending event, just show one
                     // large card without repeating it in a carousel. When
@@ -256,91 +267,100 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               SliverToBoxAdapter(
                   child: SizedBox(height: Responsive.spacing(context, 28))),
               // Categories
-              SliverToBoxAdapter(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Padding(
-                      padding: EdgeInsets.symmetric(
-                          horizontal: Responsive.horizontalPadding(context)),
-                      child: Text('Categories',
-                          style:
-                              Theme.of(context).textTheme.titleSmall?.copyWith(
-                                    color: Colors.grey.shade600,
-                                    fontWeight: FontWeight.w500,
-                                  )),
-                    ),
-                    SizedBox(height: Responsive.spacing(context, 10)),
-                    SizedBox(
-                      height: Responsive.value(context, compact ? 32 : 40),
-                      child: ListView.builder(
-                        scrollDirection: Axis.horizontal,
+              if (hasCategories)
+                SliverToBoxAdapter(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Padding(
                         padding: EdgeInsets.symmetric(
                             horizontal: Responsive.horizontalPadding(context)),
-                        itemCount: _categories.length,
-                        itemBuilder: (_, i) {
-                          final selected = _selectedCategoryIndex == i;
-                          return Padding(
-                            padding: EdgeInsets.only(
+                        child: Text('Categories',
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleSmall
+                                ?.copyWith(
+                                  color: Colors.grey.shade600,
+                                  fontWeight: FontWeight.w500,
+                                )),
+                      ),
+                      SizedBox(height: Responsive.spacing(context, 10)),
+                      SizedBox(
+                        height: Responsive.value(context, compact ? 32 : 40),
+                        child: ListView.builder(
+                          scrollDirection: Axis.horizontal,
+                          padding: EdgeInsets.symmetric(
+                            horizontal:
+                                Responsive.horizontalPadding(context),
+                          ),
+                          itemCount: categories.length,
+                          itemBuilder: (_, i) {
+                            final selected = selectedCategoryIndex == i;
+                            return Padding(
+                              padding: EdgeInsets.only(
                                 right: Responsive.spacing(
-                                    context, compact ? 8 : 10)),
-                            child: Material(
-                              color: Colors.transparent,
-                              child: InkWell(
-                                onTap: () =>
-                                    setState(() => _selectedCategoryIndex = i),
-                                borderRadius: BorderRadius.circular(
+                                    context, compact ? 8 : 10),
+                              ),
+                              child: Material(
+                                color: Colors.transparent,
+                                child: InkWell(
+                                  onTap: () => setState(
+                                      () => _selectedCategoryIndex = i),
+                                  borderRadius: BorderRadius.circular(
                                     Responsive.value(
-                                        context, compact ? 18 : 20)),
-                                child: AnimatedContainer(
-                                  duration: const Duration(milliseconds: 200),
-                                  padding: EdgeInsets.symmetric(
-                                    horizontal: Responsive.value(
-                                        context, compact ? 12 : 18),
-                                    vertical: Responsive.value(
-                                        context, compact ? 6 : 10),
+                                        context, compact ? 18 : 20),
                                   ),
-                                  decoration: BoxDecoration(
-                                    color: selected
-                                        ? AppColors.primaryDark
-                                        : AppColors.primary.withValues(
-                                            alpha: 0.10),
-                                    borderRadius: BorderRadius.circular(
-                                        Responsive.value(
-                                            context, compact ? 18 : 20)),
-                                    border: Border.all(
+                                  child: AnimatedContainer(
+                                    duration:
+                                        const Duration(milliseconds: 200),
+                                    padding: EdgeInsets.symmetric(
+                                      horizontal: Responsive.value(
+                                          context, compact ? 12 : 18),
+                                      vertical: Responsive.value(
+                                          context, compact ? 6 : 10),
+                                    ),
+                                    decoration: BoxDecoration(
                                       color: selected
                                           ? AppColors.primaryDark
-                                          : AppColors.primary.withValues(
-                                              alpha: 0.25),
-                                      width: 1,
-                                    ),
-                                  ),
-                                  child: Center(
-                                    child: Text(
-                                      _categories[i],
-                                      style: TextStyle(
-                                        fontSize: Responsive.fontSize(
-                                            context, compact ? 12 : 14),
-                                        fontWeight: selected
-                                            ? FontWeight.w600
-                                            : FontWeight.w500,
+                                          : AppColors.primary
+                                              .withValues(alpha: 0.10),
+                                      borderRadius: BorderRadius.circular(
+                                        Responsive.value(
+                                            context, compact ? 18 : 20),
+                                      ),
+                                      border: Border.all(
                                         color: selected
-                                            ? Colors.white
-                                            : AppColors.primary,
+                                            ? AppColors.primaryDark
+                                            : AppColors.primary
+                                                .withValues(alpha: 0.25),
+                                        width: 1,
+                                      ),
+                                    ),
+                                    child: Center(
+                                      child: Text(
+                                        categories[i],
+                                        style: TextStyle(
+                                          fontSize: Responsive.fontSize(
+                                              context, compact ? 12 : 14),
+                                          fontWeight: selected
+                                              ? FontWeight.w600
+                                              : FontWeight.w500,
+                                          color: selected
+                                              ? Colors.white
+                                              : AppColors.primary,
+                                        ),
                                       ),
                                     ),
                                   ),
                                 ),
                               ),
-                            ),
-                          );
-                        },
+                            );
+                          },
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
               SliverToBoxAdapter(
                   child: SizedBox(height: Responsive.spacing(context, 28))),
               // Events Near You
@@ -502,6 +522,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                                     .state = (
                                                   lat: pos.latitude,
                                                   lng: pos.longitude,
+                                                );
+                                                // Persist location so we can restore it on next app launch.
+                                                await AppStorage
+                                                    .saveUserLocation(
+                                                  pos.latitude,
+                                                  pos.longitude,
                                                 );
                                               },
                                         style: FilledButton.styleFrom(
