@@ -16,21 +16,23 @@ class ShimmerEventCard extends StatelessWidget {
       child: Card(
         clipBehavior: Clip.antiAlias,
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             AspectRatio(
               aspectRatio: aspectRatio,
               child: Container(color: Colors.white),
             ),
-            Expanded(
+            Flexible(
+              fit: FlexFit.loose,
               child: Padding(
                 padding: const EdgeInsets.all(12),
                 child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Container(
-                      height: 14,
+                      height: 10,
                       width: double.infinity,
                       decoration: BoxDecoration(
                         color: Colors.white,
@@ -39,16 +41,16 @@ class ShimmerEventCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 6),
                     Container(
-                      height: 10,
+                      height: 8,
                       width: 120,
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(4),
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 4),
                     Container(
-                      height: 24,
+                      height: 16,
                       width: 80,
                       decoration: BoxDecoration(
                         color: Colors.white,

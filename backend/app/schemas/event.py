@@ -108,6 +108,9 @@ class EventListItem(BaseModel):
     start_utc: datetime
     end_utc: datetime
     timezone: str
+    lat: float | None
+    lng: float | None
+    address: str | None
     city: str | None
     country_code: str | None
     is_virtual: bool

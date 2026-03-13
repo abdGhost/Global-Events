@@ -1,32 +1,35 @@
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../core/data/dummy_events.dart';
 import '../../../core/responsive/responsive.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../models/event.dart';
+import '../../../providers/search_events_provider.dart';
 
 enum _ChatFilter { all, unread }
 
-class ChatInboxScreen extends StatefulWidget {
+class ChatInboxScreen extends ConsumerStatefulWidget {
   const ChatInboxScreen({super.key});
 
   @override
-  State<ChatInboxScreen> createState() => _ChatInboxScreenState();
+  ConsumerState<ChatInboxScreen> createState() => _ChatInboxScreenState();
 }
 
-class _ChatInboxScreenState extends State<ChatInboxScreen> {
+class _ChatInboxScreenState extends ConsumerState<ChatInboxScreen> {
   _ChatFilter _filter = _ChatFilter.all;
 
-  List<_ChatItem> _buildItems() {
-    final base = dummyEventsFull
+  List<_ChatItem> _buildItems(List<EventListItem> events) {
+    final base = events
         .map(
           (e) => _ChatItem(
             eventId: e.id,
             title: e.title,
             subtitle: 'Tap to join the live chat',
+            // Simple unread heuristic based on popularity for now.
             unread: e.rsvpCount > 0 ? (e.rsvpCount % 5) : 0,
             timeLabel: 'Today',
           ),
@@ -100,7 +103,7 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
   @override
   Widget build(BuildContext context) {
     final pad = Responsive.horizontalPadding(context);
-    final items = _buildItems();
+    final eventsAsync = ref.watch(searchEventsProvider(const SearchParams()));
 
     return Scaffold(
       body: Stack(
@@ -149,20 +152,66 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
                 ),
               ),
               Expanded(
-                child: ListView.builder(
-                  padding: EdgeInsets.fromLTRB(
-                    pad,
-                    0,
-                    pad,
-                    Responsive.spacing(context, 20),
+                child: eventsAsync.when(
+                  loading: () => const Center(
+                    child: CircularProgressIndicator(),
                   ),
-                  itemCount: items.length,
-                  itemBuilder: (_, i) => Padding(
-                    padding: EdgeInsets.only(
-                      bottom: Responsive.spacing(context, 10),
+                  error: (e, _) => Center(
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: Responsive.horizontalPadding(context),
+                      ),
+                      child: Text(
+                        'Could not load chats.\n$e',
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context)
+                            .textTheme
+                            .bodySmall
+                            ?.copyWith(color: Colors.grey),
+                      ),
                     ),
-                    child: _ChatInboxTile(item: items[i]),
                   ),
+                  data: (events) {
+                    if (events.isEmpty) {
+                      return Center(
+                        child: Text(
+                          'No events available yet.\nCreate or join an event to start chatting.',
+                          textAlign: TextAlign.center,
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodySmall
+                              ?.copyWith(color: Colors.grey),
+                        ),
+                      );
+                    }
+                    final items = _buildItems(events);
+                    if (items.isEmpty) {
+                      return Center(
+                        child: Text(
+                          'No chats yet.',
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodySmall
+                              ?.copyWith(color: Colors.grey),
+                        ),
+                      );
+                    }
+                    return ListView.builder(
+                      padding: EdgeInsets.fromLTRB(
+                        pad,
+                        0,
+                        pad,
+                        Responsive.spacing(context, 20),
+                      ),
+                      itemCount: items.length,
+                      itemBuilder: (_, i) => Padding(
+                        padding: EdgeInsets.only(
+                          bottom: Responsive.spacing(context, 10),
+                        ),
+                        child: _ChatInboxTile(item: items[i]),
+                      ),
+                    );
+                  },
                 ),
               ),
             ],

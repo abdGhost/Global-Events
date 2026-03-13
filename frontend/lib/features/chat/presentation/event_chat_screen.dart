@@ -4,8 +4,12 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:go_router/go_router.dart';
 import 'package:emoji_picker_flutter/emoji_picker_flutter.dart';
 
+import '../../../core/api/endpoints.dart';
 import '../../../core/responsive/responsive.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../providers/api_client_provider.dart';
+import '../../../providers/chat_messages_provider.dart';
+import '../../../providers/current_user_provider.dart';
 import '../../../providers/event_detail_provider.dart';
 
 class EventChatScreen extends ConsumerStatefulWidget {
@@ -22,23 +26,6 @@ class _EventChatScreenState extends ConsumerState<EventChatScreen> {
   final _scrollController = ScrollController();
   bool _isScrolled = false;
   bool _showEmojiPicker = false;
-  final _messages = <_ChatBubble>[
-    _ChatBubble(
-        isMe: false,
-        name: 'Alex',
-        text: 'Hey, who\'s joining from Europe?',
-        time: '2m'),
-    _ChatBubble(
-        isMe: true,
-        name: 'You',
-        text: 'I am! Can\'t wait for this one.',
-        time: '1m'),
-    _ChatBubble(
-        isMe: false,
-        name: 'Jordan',
-        text: 'Same here. First time at a virtual meetup.',
-        time: 'Just now'),
-  ];
 
   @override
   void initState() {
@@ -60,17 +47,30 @@ class _EventChatScreenState extends ConsumerState<EventChatScreen> {
   void _handleSend() {
     final text = _controller.text.trim();
     if (text.isEmpty) return;
-    setState(() {
-      _messages.add(
-        _ChatBubble(isMe: true, name: 'You', text: text, time: 'Just now'),
-      );
-    });
-    _controller.clear();
-    _scrollController.animateTo(
-      0,
-      duration: const Duration(milliseconds: 250),
-      curve: Curves.easeOut,
-    );
+    () async {
+      try {
+        final client = ref.read(apiClientProvider);
+        await client.post<Map<String, dynamic>>(
+          Endpoints.eventChatMessages(widget.eventId),
+          data: <String, dynamic>{'content': text},
+        );
+        _controller.clear();
+        ref.invalidate(chatMessagesProvider(widget.eventId));
+        if (_scrollController.hasClients) {
+          _scrollController.animateTo(
+            0,
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeOut,
+          );
+        }
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to send message: $e'),
+          ),
+        );
+      }
+    }();
   }
 
   @override
@@ -81,6 +81,19 @@ class _EventChatScreenState extends ConsumerState<EventChatScreen> {
           data: (e) => e.title,
           orElse: () => 'Event chat',
         );
+    final messagesAsync = ref.watch(chatMessagesProvider(widget.eventId));
+    final currentUserAsync = ref.watch(currentUserProvider);
+    final peopleLabel = messagesAsync.maybeWhen(
+      data: (history) {
+        final participantIds = history.map((m) => m.userId).toSet();
+        final count = participantIds.length;
+        if (count == 0) return 'No messages yet';
+        if (count == 1) return '1 person has chatted';
+        return '$count people have chatted';
+      },
+      orElse: () => 'Live chat',
+    );
+
     return Scaffold(
       body: Stack(
         children: [
@@ -147,7 +160,7 @@ class _EventChatScreenState extends ConsumerState<EventChatScreen> {
                             ),
                             SizedBox(height: Responsive.spacing(context, 2)),
                             Text(
-                              '53 people in this chat',
+                              peopleLabel,
                               style: Theme.of(context)
                                   .textTheme
                                   .bodySmall
@@ -198,7 +211,7 @@ class _EventChatScreenState extends ConsumerState<EventChatScreen> {
                         ),
                         SizedBox(width: Responsive.spacing(context, 8)),
                         Text(
-                          'Alex is typing...',
+                          peopleLabel,
                           style: Theme.of(context)
                               .textTheme
                               .bodySmall
@@ -210,18 +223,66 @@ class _EventChatScreenState extends ConsumerState<EventChatScreen> {
                 ),
               ),
               Expanded(
-                child: ListView.builder(
-                  controller: _scrollController,
-                  reverse: true,
-                  padding: EdgeInsets.fromLTRB(
-                      pad,
-                      Responsive.spacing(context, 6),
-                      pad,
-                      Responsive.spacing(context, 12)),
-                  itemCount: _messages.length,
-                  itemBuilder: (_, i) {
-                    final m = _messages[_messages.length - 1 - i];
-                    return _ChatBubbleView(bubble: m);
+                child: messagesAsync.when(
+                  loading: () => const Center(
+                    child: CircularProgressIndicator(),
+                  ),
+                  error: (e, _) => Center(
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: Responsive.horizontalPadding(context),
+                      ),
+                      child: Text(
+                        'Could not load chat messages.\n$e',
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context)
+                            .textTheme
+                            .bodySmall
+                            ?.copyWith(color: Colors.grey),
+                      ),
+                    ),
+                  ),
+                  data: (history) {
+                    final meId = currentUserAsync.maybeWhen(
+                      data: (u) => u.id,
+                      orElse: () => null,
+                    );
+                    final all = history;
+                    if (all.isEmpty) {
+                      return Center(
+                        child: Text(
+                          'No messages yet.\nBe the first to say hi!',
+                          textAlign: TextAlign.center,
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodySmall
+                              ?.copyWith(color: Colors.grey),
+                        ),
+                      );
+                    }
+                    return ListView.builder(
+                      controller: _scrollController,
+                      reverse: true,
+                      padding: EdgeInsets.fromLTRB(
+                        pad,
+                        Responsive.spacing(context, 6),
+                        pad,
+                        Responsive.spacing(context, 12),
+                      ),
+                      itemCount: all.length,
+                      itemBuilder: (_, i) {
+                        final m = all[all.length - 1 - i];
+                        final isMe = meId != null && m.userId == meId;
+                        return _ChatBubbleView(
+                          bubble: _ChatBubble(
+                            isMe: isMe,
+                            name: isMe ? 'You' : 'Guest',
+                            text: m.content,
+                            time: '',
+                          ),
+                        );
+                      },
+                    );
                   },
                 ),
               ),

@@ -23,8 +23,9 @@ class EventCard extends StatelessWidget {
   final EventCardSize size;
   final bool showGoingButton;
 
-  String get _locationLabel =>
-      event.isVirtual ? 'Virtual' : (event.city ?? event.countryCode ?? 'TBD');
+  String get _locationLabel => event.isVirtual
+      ? 'Virtual'
+      : (event.city ?? event.address ?? event.countryCode ?? 'Location to be announced');
   String get _timeLabel {
     final local = event.startUtc.toLocal();
     final now = DateTime.now();

@@ -8,10 +8,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:glass_kit/glass_kit.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/location/location_service.dart';
 import '../../../core/responsive/responsive.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../models/event.dart';
 import '../../../providers/nearby_events_provider.dart';
 import '../../../providers/trending_events_provider.dart';
+import '../../../providers/user_location_provider.dart';
 import 'widgets/event_card.dart';
 import 'widgets/shimmer_event_card.dart';
 
@@ -39,6 +42,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   int _selectedCategoryIndex = 0;
   final _scrollController = ScrollController();
   bool _isScrolled = false;
+  bool _isRequestingLocation = false;
 
   @override
   void initState() {
@@ -60,8 +64,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Widget build(BuildContext context) {
     final compact = Responsive.isCompact(context);
     final trending = ref.watch(trendingEventsProvider);
-    final nearby = ref.watch(
-        nearbyEventsProvider(const NearbyParams(lat: 40.7128, lng: -74.0060)));
+    final userLocation = ref.watch(userLocationProvider);
+    final nearby = userLocation == null
+        ? const AsyncValue<List<EventListItem>>.data(<EventListItem>[])
+        : ref.watch(
+            nearbyEventsProvider(
+              NearbyParams(
+                lat: userLocation.lat,
+                lng: userLocation.lng,
+              ),
+            ),
+          );
 
     return Scaffold(
       body: Stack(
@@ -163,11 +176,25 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 child: trending.when(
                   data: (events) {
                     if (events.isEmpty) return const SizedBox.shrink();
+
+                    // Apply category filter from chips (home screen).
+                    final selectedCategory = _categories[_selectedCategoryIndex];
+                    final filtered = events
+                        .where(
+                          (e) =>
+                              e.category != null &&
+                              e.category!.toLowerCase() ==
+                                  selectedCategory.toLowerCase(),
+                        )
+                        .toList();
+
+                    final visible = filtered.isEmpty ? events : filtered;
+
                     // If there is only a single trending event, just show one
                     // large card without repeating it in a carousel. When
                     // there are multiple events, use the carousel.
-                    if (events.length == 1) {
-                      final e = events.first;
+                    if (visible.length == 1) {
+                      final e = visible.first;
                       return Padding(
                         padding: EdgeInsets.symmetric(
                           horizontal: Responsive.horizontalPadding(context),
@@ -185,9 +212,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     return SizedBox(
                       height: Responsive.trendingCarouselHeight(context),
                       child: CarouselSlider.builder(
-                        itemCount: events.length.clamp(0, 8),
+                        itemCount: visible.length.clamp(0, 8),
                         itemBuilder: (_, i, __) {
-                          final e = events[i];
+                          final e = visible[i];
                           return Padding(
                             padding: EdgeInsets.symmetric(
                                 horizontal: Responsive.spacing(context, 6)),
@@ -372,7 +399,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               SliverToBoxAdapter(
                 child: nearby.when(
                   data: (events) {
-                    if (events.isEmpty) {
+                    final hasLocation = userLocation != null;
+                    if (events.isEmpty && !hasLocation) {
                       return Padding(
                         padding: EdgeInsets.symmetric(
                             horizontal: Responsive.horizontalPadding(context)),
@@ -435,6 +463,139 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                             ),
                                           ),
                                     ),
+                                    SizedBox(
+                                        height:
+                                            Responsive.spacing(context, 8)),
+                                    Align(
+                                      alignment: Alignment.centerLeft,
+                                      child: FilledButton(
+                                        onPressed: _isRequestingLocation
+                                            ? null
+                                            : () async {
+                                                setState(() =>
+                                                    _isRequestingLocation =
+                                                        true);
+                                                final pos =
+                                                    await LocationService
+                                                        .requestAndGetCurrentPosition();
+                                                if (!mounted) return;
+                                                setState(() =>
+                                                    _isRequestingLocation =
+                                                        false);
+                                                if (pos == null) {
+                                                  ScaffoldMessenger.of(context)
+                                                      .showSnackBar(
+                                                    const SnackBar(
+                                                      content: Text(
+                                                          'Please enable location services in your browser or device settings.'),
+                                                    ),
+                                                  );
+                                                  return;
+                                                }
+                                                // Debug log: user's resolved location.
+                                                // ignore: avoid_print
+                                                print(
+                                                    'User location: lat=${pos.latitude}, lng=${pos.longitude}');
+                                                ref
+                                                    .read(userLocationProvider
+                                                        .notifier)
+                                                    .state = (
+                                                  lat: pos.latitude,
+                                                  lng: pos.longitude,
+                                                );
+                                              },
+                                        style: FilledButton.styleFrom(
+                                          backgroundColor:
+                                              AppColors.primaryDark,
+                                          foregroundColor: Colors.white,
+                                          padding: EdgeInsets.symmetric(
+                                            horizontal: Responsive.value(
+                                                context, 14),
+                                            vertical: Responsive.value(
+                                                context, 8),
+                                          ),
+                                          minimumSize: const Size(0, 0),
+                                          tapTargetSize:
+                                              MaterialTapTargetSize
+                                                  .shrinkWrap,
+                                        ),
+                                        child: const Text(
+                                          'Enable location',
+                                          style: TextStyle(fontSize: 12),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    }
+                    if (events.isEmpty && hasLocation) {
+                      return Padding(
+                        padding: EdgeInsets.symmetric(
+                            horizontal: Responsive.horizontalPadding(context)),
+                        child: Container(
+                          padding: EdgeInsets.symmetric(
+                              vertical: Responsive.value(context, 24),
+                              horizontal:
+                                  Responsive.horizontalPadding(context)),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).colorScheme.surface,
+                            borderRadius: BorderRadius.circular(
+                                Responsive.value(context, 16)),
+                            border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.06)),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: EdgeInsets.all(
+                                    Responsive.value(context, compact ? 6 : 8)),
+                                decoration: BoxDecoration(
+                                  color: AppColors.primary.withValues(alpha: 0.15),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: FaIcon(
+                                  FontAwesomeIcons.locationDot,
+                                  size: Responsive.iconSize(context, 18),
+                                  color: AppColors.primary,
+                                ),
+                              ),
+                              SizedBox(width: Responsive.spacing(context, 14)),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      'No events near your location yet',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodyMedium
+                                          ?.copyWith(
+                                            color: Colors.white.withValues(
+                                              alpha: 0.86,
+                                            ),
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                    ),
+                                    SizedBox(
+                                        height:
+                                            Responsive.spacing(context, 4)),
+                                    Text(
+                                      'Try adjusting the map or exploring trending events.',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodySmall
+                                          ?.copyWith(
+                                            color: Colors.white.withValues(
+                                              alpha: 0.7,
+                                            ),
+                                          ),
+                                    ),
                                   ],
                                 ),
                               ),
@@ -464,23 +625,44 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       ),
                     );
                   },
-                  loading: () => SizedBox(
-                    height: Responsive.nearYouListHeight(context),
-                    child: ListView.builder(
-                      scrollDirection: Axis.horizontal,
+                  loading: () => const SizedBox.shrink(),
+                  error: (e, _) => Padding(
+                    padding: EdgeInsets.symmetric(
+                        horizontal: Responsive.horizontalPadding(context)),
+                    child: Container(
                       padding: EdgeInsets.symmetric(
+                          vertical: Responsive.value(context, 20),
                           horizontal: Responsive.horizontalPadding(context)),
-                      itemCount: 4,
-                      itemBuilder: (_, __) => Padding(
-                        padding: EdgeInsets.only(
-                            right: Responsive.spacing(context, 14)),
-                        child: SizedBox(
-                            width: Responsive.smallCardWidth(context),
-                            child: const ShimmerEventCard(aspectRatio: 4 / 3)),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.surface,
+                        borderRadius: BorderRadius.circular(
+                            Responsive.value(context, 16)),
+                        border: Border.all(
+                            color: Colors.red.withValues(alpha: 0.4)),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.error_outline,
+                            color: Colors.red.shade300,
+                          ),
+                          SizedBox(
+                              width: Responsive.spacing(context, 10)),
+                          Expanded(
+                            child: Text(
+                              'Could not load events near you. Check console logs for details.',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodySmall
+                                  ?.copyWith(
+                                    color: Colors.red.shade200,
+                                  ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
-                  error: (_, __) => const SizedBox.shrink(),
                 ),
               ),
               SliverToBoxAdapter(

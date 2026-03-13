@@ -1,33 +1,34 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:latlong2/latlong.dart';
 
-import '../../../core/data/dummy_events.dart';
 import '../../../core/responsive/responsive.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../models/event.dart';
+import '../../../providers/search_events_provider.dart';
+import '../../../providers/user_location_provider.dart';
 
-class MapScreen extends StatefulWidget {
+class MapScreen extends ConsumerStatefulWidget {
   const MapScreen({super.key});
 
   @override
-  State<MapScreen> createState() => _MapScreenState();
+  ConsumerState<MapScreen> createState() => _MapScreenState();
 }
 
-class _MapScreenState extends State<MapScreen> {
-  // Simple center over Europe / Atlantic so dummy events look ok.
+class _MapScreenState extends ConsumerState<MapScreen> {
   final _mapController = MapController();
-  final _center = const LatLng(20.0, 0.0);
+  LatLng _center = const LatLng(20.0, 0.0);
   double _zoom = 2.5;
   int _selectedFilterIndex = 0;
 
-  List<Event> _applyFilter(List<Event> all) {
+  List<EventListItem> _applyFilter(List<EventListItem> all) {
     switch (_selectedFilterIndex) {
       case 1: // Today
         final today = DateTime.now();
         return all.where((e) {
-          final d = e.displayStart;
+          final d = e.startUtc;
           return d.year == today.year &&
               d.month == today.month &&
               d.day == today.day;
@@ -38,10 +39,10 @@ class _MapScreenState extends State<MapScreen> {
             now.subtract(Duration(days: now.weekday - 1)); // Monday
         final endOfWeek = startOfWeek.add(const Duration(days: 7));
         return all.where((e) {
-          final d = e.displayStart;
+          final d = e.startUtc;
           return d.isAfter(startOfWeek) && d.isBefore(endOfWeek);
         }).toList();
-      case 3: // Near me (for now: non-virtual events only)
+      case 3: // Near me (non-virtual, nearby)
         return all.where((e) => !e.isVirtual).toList();
       default:
         return all;
@@ -51,197 +52,246 @@ class _MapScreenState extends State<MapScreen> {
   @override
   Widget build(BuildContext context) {
     final pad = Responsive.horizontalPadding(context);
-    final baseEvents =
-        dummyEventsFull.where((e) => e.lat != null && e.lng != null).toList();
-    final events = _applyFilter(baseEvents);
+    final userLocation = ref.watch(userLocationProvider);
+    if (userLocation != null) {
+      _center = LatLng(userLocation.lat, userLocation.lng);
+      _zoom = 11;
+    }
+
+    final AsyncValue<List<EventListItem>> asyncEvents =
+        ref.watch(searchEventsProvider(const SearchParams()));
 
     return Scaffold(
-      body: Stack(
-        children: [
-          Positioned.fill(
-            child: FlutterMap(
-              mapController: _mapController,
-              options: MapOptions(
-                initialCenter: _center,
-                initialZoom: _zoom,
-              ),
-              children: [
-                TileLayer(
-                  urlTemplate:
-                      'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                  userAgentPackageName: 'com.globalevents.app',
-                ),
-                MarkerLayer(
-                  markers: [
-                    for (var i = 0; i < events.length; i++)
-                      Marker(
-                        width: 40,
-                        height: 40,
-                        point: LatLng(
-                          events[i].lat!,
-                          events[i].lng!,
-                        ),
-                        child: _EventMarker(label: events[i].city ?? 'Unknown'),
-                      ),
+      body: asyncEvents.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, _) => Center(
+          child: Padding(
+            padding: EdgeInsets.symmetric(
+              horizontal: Responsive.horizontalPadding(context),
+            ),
+            child: Text(
+              'Could not load events for the map.\n$e',
+              textAlign: TextAlign.center,
+              style: Theme.of(context)
+                  .textTheme
+                  .bodySmall
+                  ?.copyWith(color: Colors.grey),
+            ),
+          ),
+        ),
+        data: (all) {
+          // Debug: inspect location data coming from backend
+          for (final e in all) {
+            // ignore: avoid_print
+            print(
+              'MapScreen event -> id=${e.id}, title=${e.title}, '
+              'address=${e.address}, city=${e.city}, country=${e.countryCode}, '
+              'lat=${e.lat}, lng=${e.lng}',
+            );
+          }
+
+          final events = _applyFilter(
+            all.where((e) => e.lat != null && e.lng != null).toList(),
+          );
+          return Stack(
+            children: [
+              Positioned.fill(
+                child: FlutterMap(
+                  mapController: _mapController,
+                  options: MapOptions(
+                    initialCenter: _center,
+                    initialZoom: _zoom,
+                  ),
+                  children: [
+                    TileLayer(
+                      urlTemplate:
+                          'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                      userAgentPackageName: 'com.globalevents.app',
+                    ),
+                    MarkerLayer(
+                      markers: [
+                        for (var i = 0; i < events.length; i++)
+                          Marker(
+                            width: 40,
+                            height: 40,
+                            point: LatLng(
+                              events[i].lat!,
+                              events[i].lng!,
+                            ),
+                            child: _EventMarker(
+                              label: events[i].title,
+                            ),
+                          ),
+                      ],
+                    ),
                   ],
                 ),
-              ],
-            ),
-          ),
-          // Top app bar overlay
-          SafeArea(
-            child: Padding(
-              padding: EdgeInsets.fromLTRB(
-                pad,
-                Responsive.spacing(context, 10),
-                pad,
-                0,
               ),
-              child: Row(
-                children: [
-                  Container(
-                    padding: EdgeInsets.all(
-                        Responsive.value(context, 7)),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.6),
-                      borderRadius: BorderRadius.circular(
-                          Responsive.value(context, 12)),
-                    ),
-                    child: const FaIcon(
-                      FontAwesomeIcons.locationDot,
-                      size: 16,
-                      color: Colors.white,
-                    ),
+              // Top app bar overlay
+              SafeArea(
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    pad,
+                    Responsive.spacing(context, 10),
+                    pad,
+                    0,
                   ),
-                  SizedBox(width: Responsive.spacing(context, 10)),
-                  Text(
-                    'Explore events on map',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w600,
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: EdgeInsets.all(
+                          Responsive.value(context, 7),
                         ),
-                  ),
-                  const Spacer(),
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.6),
-                      borderRadius: BorderRadius.circular(
-                          Responsive.value(context, 999)),
-                    ),
-                    child: IconButton(
-                      iconSize: Responsive.iconSize(context, 18),
-                      icon: const FaIcon(
-                        FontAwesomeIcons.locationCrosshairs,
-                        color: Colors.white,
-                      ),
-                      onPressed: () =>
-                          _mapController.move(_center, _zoom),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          // Bottom sheet with events
-          Align(
-            alignment: Alignment.bottomCenter,
-            child: Container(
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surface,
-                borderRadius: BorderRadius.vertical(
-                  top: Radius.circular(Responsive.value(context, 22)),
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.35),
-                    blurRadius: 20,
-                    offset: const Offset(0, -8),
-                  ),
-                ],
-              ),
-              child: Padding(
-                padding: EdgeInsets.fromLTRB(
-                  pad,
-                  Responsive.spacing(context, 10),
-                  pad,
-                  Responsive.spacing(context, 14),
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Center(
-                      child: Container(
-                        width: 40,
-                        height: 4,
                         decoration: BoxDecoration(
-                          color: Colors.grey.shade400,
-                          borderRadius: BorderRadius.circular(999),
+                          color: Colors.black.withOpacity(0.6),
+                          borderRadius: BorderRadius.circular(
+                            Responsive.value(context, 12),
+                          ),
+                        ),
+                        child: const FaIcon(
+                          FontAwesomeIcons.locationDot,
+                          size: 16,
+                          color: Colors.white,
                         ),
                       ),
-                    ),
-                    SizedBox(height: Responsive.spacing(context, 10)),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'Events on map',
-                          style: Theme.of(context)
-                              .textTheme
-                              .titleMedium
-                              ?.copyWith(fontWeight: FontWeight.w600),
+                      SizedBox(width: Responsive.spacing(context, 10)),
+                      Text(
+                        'Explore events on map',
+                        style: Theme.of(context)
+                            .textTheme
+                            .titleMedium
+                            ?.copyWith(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
+                            ),
+                      ),
+                      const Spacer(),
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.6),
+                          borderRadius: BorderRadius.circular(
+                            Responsive.value(context, 999),
+                          ),
                         ),
-                        Text(
-                          '${events.length} found',
-                          style: Theme.of(context)
-                              .textTheme
-                              .bodySmall
-                              ?.copyWith(color: Colors.grey.shade600),
+                        child: IconButton(
+                          iconSize: Responsive.iconSize(context, 18),
+                          icon: const FaIcon(
+                            FontAwesomeIcons.locationCrosshairs,
+                            color: Colors.white,
+                          ),
+                          onPressed: () =>
+                              _mapController.move(_center, _zoom),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              // Bottom sheet with events
+              Align(
+                alignment: Alignment.bottomCenter,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surface,
+                    borderRadius: BorderRadius.vertical(
+                      top: Radius.circular(Responsive.value(context, 22)),
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.35),
+                        blurRadius: 20,
+                        offset: const Offset(0, -8),
+                      ),
+                    ],
+                  ),
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(
+                      pad,
+                      Responsive.spacing(context, 10),
+                      pad,
+                      Responsive.spacing(context, 14),
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Center(
+                          child: Container(
+                            width: 40,
+                            height: 4,
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade400,
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                          ),
+                        ),
+                        SizedBox(height: Responsive.spacing(context, 10)),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'Events on map',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .titleMedium
+                                  ?.copyWith(fontWeight: FontWeight.w600),
+                            ),
+                            Text(
+                              '${events.length} found',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodySmall
+                                  ?.copyWith(color: Colors.grey.shade600),
+                            ),
+                          ],
+                        ),
+                        SizedBox(height: Responsive.spacing(context, 8)),
+                        _FilterChipsRow(
+                          selectedIndex: _selectedFilterIndex,
+                          onSelected: (index) {
+                            setState(() {
+                              _selectedFilterIndex = index;
+                            });
+                          },
+                        ),
+                        SizedBox(height: Responsive.spacing(context, 8)),
+                        SizedBox(
+                          height: Responsive.value(context, 120),
+                          child: ListView.separated(
+                            scrollDirection: Axis.horizontal,
+                            itemCount: events.length,
+                            separatorBuilder: (_, __) => SizedBox(
+                              width: Responsive.spacing(context, 10),
+                            ),
+                            itemBuilder: (_, i) => _MapEventChip(
+                              item: EventListItem(
+                                id: events[i].id,
+                                title: events[i].title,
+                                startUtc: events[i].startUtc,
+                                endUtc: events[i].endUtc,
+                                timezone: events[i].timezone,
+                                address: events[i].address,
+                                lat: events[i].lat,
+                                lng: events[i].lng,
+                                city: events[i].city,
+                                countryCode: events[i].countryCode,
+                                isVirtual: events[i].isVirtual,
+                                category: events[i].category,
+                                imageUrl: events[i].imageUrl,
+                                rsvpCount: events[i].rsvpCount,
+                                viewsCount: events[i].viewsCount,
+                              ),
+                            ),
+                          ),
                         ),
                       ],
                     ),
-                    SizedBox(height: Responsive.spacing(context, 8)),
-                    _FilterChipsRow(
-                      selectedIndex: _selectedFilterIndex,
-                      onSelected: (index) {
-                        setState(() {
-                          _selectedFilterIndex = index;
-                        });
-                      },
-                    ),
-                    SizedBox(height: Responsive.spacing(context, 8)),
-                    SizedBox(
-                      height: Responsive.value(context, 120),
-                      child: ListView.separated(
-                        scrollDirection: Axis.horizontal,
-                        itemCount: events.length,
-                        separatorBuilder: (_, __) => SizedBox(
-                          width: Responsive.spacing(context, 10),
-                        ),
-                        itemBuilder: (_, i) => _MapEventChip(
-                          item: EventListItem(
-                            id: events[i].id,
-                            title: events[i].title,
-                            startUtc: events[i].startUtc,
-                            endUtc: events[i].endUtc,
-                            timezone: events[i].timezone,
-                            city: events[i].city,
-                            countryCode: events[i].countryCode,
-                            isVirtual: events[i].isVirtual,
-                            category: events[i].category,
-                            imageUrl: events[i].imageUrl,
-                            rsvpCount: events[i].rsvpCount,
-                            viewsCount: events[i].viewsCount,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ),
-            ),
-          ),
-        ],
+            ],
+          );
+        },
       ),
     );
   }
@@ -255,26 +305,37 @@ class _EventMarker extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
           decoration: BoxDecoration(
             color: Colors.black.withOpacity(0.7),
+            border: Border.all(
+              color: Colors.white.withOpacity(0.35),
+              width: 0.6,
+            ),
             borderRadius: BorderRadius.circular(12),
           ),
-          child: Text(
-            label,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 10,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 80),
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              softWrap: false,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 8,
+              ),
             ),
           ),
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: 2),
         const Icon(
           Icons.location_on,
           color: AppColors.primaryDark,
-          size: 24,
+          size: 16,
         ),
       ],
     );
@@ -288,6 +349,8 @@ class _MapEventChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final locationLabel = item.address ?? 'Location to be announced';
+
     return Container(
       width: Responsive.value(context, 220),
       padding: EdgeInsets.all(Responsive.spacing(context, 10)),
@@ -296,7 +359,8 @@ class _MapEventChip extends StatelessWidget {
         borderRadius:
             BorderRadius.circular(Responsive.value(context, 16)),
         border: Border.all(
-          color: Colors.black.withOpacity(0.06),
+          color: Colors.black.withOpacity(0.10),
+          width: 0.6,
         ),
       ),
       child: Column(
@@ -312,7 +376,7 @@ class _MapEventChip extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            item.city ?? 'Unknown location',
+            locationLabel,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: Colors.grey.shade600,
                 ),

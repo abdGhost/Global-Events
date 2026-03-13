@@ -1,25 +1,48 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 
 import '../../../core/responsive/responsive.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../providers/user_location_provider.dart';
 
-class LocationPickerScreen extends StatefulWidget {
+class LocationPickerScreen extends ConsumerStatefulWidget {
   const LocationPickerScreen({super.key});
 
   @override
-  State<LocationPickerScreen> createState() => _LocationPickerScreenState();
+  ConsumerState<LocationPickerScreen> createState() =>
+      _LocationPickerScreenState();
 }
 
-class _LocationPickerScreenState extends State<LocationPickerScreen> {
+class _LocationPickerScreenState extends ConsumerState<LocationPickerScreen> {
   final _mapController = MapController();
-  final _center = const LatLng(20.0, 0.0);
+  LatLng _center = const LatLng(20.0, 0.0);
   LatLng? _picked;
   String? _address;
+  String? _city;
+  String? _countryCode;
   bool _isLoadingAddress = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // If the app already has a user location (from Enable location),
+    // center the picker map there and pre-select that point so users
+    // can easily fine-tune it.
+    final loc = ref.read(userLocationProvider);
+    if (loc != null) {
+      _center = LatLng(loc.lat, loc.lng);
+      _picked = _center;
+      // Move the map after the first frame so the controller is ready.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _mapController.move(_center, 13);
+        _reverseGeocode(_center);
+      });
+    }
+  }
 
   Future<void> _reverseGeocode(LatLng latLng) async {
     setState(() {
@@ -45,17 +68,30 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
       if (resp.statusCode == 200) {
         final data = json.decode(resp.body) as Map<String, dynamic>;
         final displayName = data['display_name'] as String?;
+        final addr = data['address'] as Map<String, dynamic>?;
+        final city = addr?['city'] ??
+            addr?['town'] ??
+            addr?['village'] ??
+            addr?['hamlet'] ??
+            addr?['suburb'];
+        final countryCode = (addr?['country_code'] as String?)?.toUpperCase();
         setState(() {
           _address = displayName ?? 'Selected location';
+          _city = city as String?;
+          _countryCode = countryCode;
         });
       } else {
         setState(() {
           _address = 'Selected location';
+          _city = null;
+          _countryCode = null;
         });
       }
     } catch (_) {
       setState(() {
         _address = 'Selected location';
+        _city = null;
+        _countryCode = null;
       });
     } finally {
       if (mounted) {
@@ -197,10 +233,15 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
                       onPressed: _picked == null || _isLoadingAddress
                           ? null
                           : () {
+                              final loc =
+                                  (lat: _picked!.latitude, lng: _picked!.longitude);
+                              ref.read(userLocationProvider.notifier).state = loc;
                               Navigator.of(context).pop({
-                                'lat': _picked!.latitude,
-                                'lng': _picked!.longitude,
+                                'lat': loc.lat,
+                                'lng': loc.lng,
                                 'address': _address,
+                                'city': _city,
+                                'countryCode': _countryCode,
                               });
                             },
                       style: FilledButton.styleFrom(

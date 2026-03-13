@@ -4,9 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
-import '../../../core/data/dummy_events.dart';
 import '../../../core/responsive/responsive.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../models/event.dart';
+import '../../../providers/search_events_provider.dart';
 import '../../home/presentation/widgets/event_card.dart';
 
 class SearchScreen extends ConsumerStatefulWidget {
@@ -28,19 +29,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // For now, use in-memory dummy events instead of backend search.
-    final all = dummyEventListItems;
-    final q = _query.trim().toLowerCase();
-    final events = q.isEmpty
-        ? all
-        : all
-            .where(
-              (e) =>
-                  e.title.toLowerCase().contains(q) ||
-                  (e.category?.toLowerCase().contains(q) ?? false) ||
-                  (e.city?.toLowerCase().contains(q) ?? false),
-            )
-            .toList();
+    // Always load all events from backend search, then filter in-memory
+    // by what the user types.
+    final AsyncValue<List<EventListItem>> results =
+        ref.watch(searchEventsProvider(const SearchParams()));
 
     return Scaffold(
       body: Stack(
@@ -86,25 +78,76 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                 ),
               ),
               Expanded(
-                child: events.isEmpty
-                    ? Center(
+                child: results.when(
+                  loading: () => const Center(
+                    child: CircularProgressIndicator(),
+                  ),
+                  error: (e, _) => Center(
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: Responsive.horizontalPadding(context),
+                      ),
+                      child: Text(
+                        'Something went wrong while loading events.\n$e',
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context)
+                            .textTheme
+                            .bodySmall
+                            ?.copyWith(color: Colors.grey),
+                      ),
+                    ),
+                  ),
+                  data: (allEvents) {
+                    final q = _query.trim().toLowerCase();
+                    final filtered = q.isEmpty
+                        ? allEvents
+                        : allEvents.where((e) {
+                            final title = e.title.toLowerCase();
+                            final category = e.category?.toLowerCase() ?? '';
+                            final city = e.city?.toLowerCase() ?? '';
+                            return title.contains(q) ||
+                                category.contains(q) ||
+                                city.contains(q);
+                          }).toList();
+
+                    if (filtered.isEmpty) {
+                      return Center(
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            FaIcon(FontAwesomeIcons.magnifyingGlassChart, size: Responsive.iconSize(context, 64), color: Colors.grey.shade400),
-                            SizedBox(height: Responsive.spacing(context, 16)),
-                            Text('No events found', style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: Colors.grey)),
+                            FaIcon(
+                              FontAwesomeIcons.magnifyingGlassChart,
+                              size: Responsive.iconSize(context, 64),
+                              color: Colors.grey.shade400,
+                            ),
+                            SizedBox(
+                                height: Responsive.spacing(context, 16)),
+                            Text(
+                              q.isEmpty
+                                  ? 'No events available'
+                                  : 'No events found',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodyLarge
+                                  ?.copyWith(color: Colors.grey),
+                            ),
                           ],
                         ),
-                      )
-                    : ListView.builder(
-                        padding: EdgeInsets.all(Responsive.horizontalPadding(context)),
-                        itemCount: events.length,
-                        itemBuilder: (_, i) => Padding(
-                          padding: EdgeInsets.only(bottom: Responsive.spacing(context, 12)),
-                          child: EventCard(event: events[i]),
-                        ),
+                      );
+                    }
+
+                    return ListView.builder(
+                      padding: EdgeInsets.all(
+                          Responsive.horizontalPadding(context)),
+                      itemCount: filtered.length,
+                      itemBuilder: (_, i) => Padding(
+                        padding: EdgeInsets.only(
+                            bottom: Responsive.spacing(context, 12)),
+                        child: EventCard(event: filtered[i]),
                       ),
+                    );
+                  },
+                ),
               ),
             ],
           ),

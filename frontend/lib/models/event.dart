@@ -118,6 +118,9 @@ class EventListItem {
   final DateTime startUtc;
   final DateTime endUtc;
   final String timezone;
+  final double? lat;
+  final double? lng;
+  final String? address;
   final String? city;
   final String? countryCode;
   final bool isVirtual;
@@ -132,6 +135,9 @@ class EventListItem {
     required this.startUtc,
     required this.endUtc,
     required this.timezone,
+    this.lat,
+    this.lng,
+    this.address,
     this.city,
     this.countryCode,
     required this.isVirtual,
@@ -148,6 +154,9 @@ class EventListItem {
       startUtc: DateTime.parse(json['start_utc'] as String),
       endUtc: DateTime.parse(json['end_utc'] as String),
       timezone: json['timezone'] as String? ?? 'UTC',
+      lat: (json['lat'] as num?)?.toDouble(),
+      lng: (json['lng'] as num?)?.toDouble(),
+      address: json['address'] as String?,
       city: json['city'] as String?,
       countryCode: json['country_code'] as String?,
       isVirtual: json['is_virtual'] as bool? ?? false,

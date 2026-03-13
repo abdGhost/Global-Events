@@ -8,7 +8,6 @@ import 'package:image_picker/image_picker.dart';
 import '../../../core/api/endpoints.dart';
 import '../../../core/responsive/responsive.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../core/timezone_service.dart';
 import '../../../core/utils/picked_image_provider.dart';
 import '../../../providers/api_client_provider.dart';
 import '../../../providers/nearby_events_provider.dart';
@@ -28,12 +27,18 @@ class _CreateEventScreenState extends ConsumerState<CreateEventScreen> {
   bool _isFree = true;
   double _maxAttendees = 100;
   String? _selectedCategory;
+  // Keep in sync with home screen category chips.
   static const _categories = <String>[
-    'Meetup',
-    'Workshop',
-    'Conference',
-    'Webinar',
-    'Party',
+    'Music',
+    'Tech',
+    'Sports',
+    'Food & Drink',
+    'Networking',
+    'Virtual',
+    'Charity',
+    'Workshops',
+    'Festivals',
+    'Arts',
   ];
   DateTime? _startAt;
   DateTime? _endAt;
@@ -46,6 +51,8 @@ class _CreateEventScreenState extends ConsumerState<CreateEventScreen> {
   XFile? _pickedBanner;
   double? _pickedLat;
   double? _pickedLng;
+  String? _pickedCity;
+  String? _pickedCountryCode;
   bool _isSubmitting = false;
 
   @override
@@ -93,6 +100,12 @@ class _CreateEventScreenState extends ConsumerState<CreateEventScreen> {
     if (_pickedLng != null) payload['lng'] = _pickedLng;
     final address = _locationController.text.trim();
     if (address.isNotEmpty) payload['address'] = address;
+    if (_pickedCity != null && _pickedCity!.isNotEmpty) {
+      payload['city'] = _pickedCity;
+    }
+    if (_pickedCountryCode != null && _pickedCountryCode!.isNotEmpty) {
+      payload['country_code'] = _pickedCountryCode;
+    }
     if (_selectedCategory != null && _selectedCategory!.isNotEmpty) {
       payload['category'] = _selectedCategory;
     }
@@ -639,6 +652,9 @@ class _CreateEventScreenState extends ConsumerState<CreateEventScreen> {
                                 setState(() {
                                   _pickedLat = (result['lat'] as num?)?.toDouble();
                                   _pickedLng = (result['lng'] as num?)?.toDouble();
+                                  _pickedCity = result['city'] as String?;
+                                  _pickedCountryCode =
+                                      result['countryCode'] as String?;
                                   final address = result['address'] as String?;
                                   _locationController.text =
                                       address ?? 'Custom location selected';

@@ -12,5 +12,7 @@ class Endpoints {
   static const String eventsNearby = '/api/events/nearby';
   static const String eventsCreate = '/api/events';
   static String eventDetail(String id) => '/api/events/$id';
-  static String eventChat(String id) => '/ws/chat/$id';
+  static String eventChatMessages(String id) => '/api/events/$id/chat/messages';
+  static String eventChatWebSocket(String id) =>
+      '/api/events/$id/chat/ws'; // ws path (not yet used)
 }

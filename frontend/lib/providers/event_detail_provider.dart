@@ -16,5 +16,10 @@ final eventDetailProvider = FutureProvider.autoDispose.family<Event, String>((re
   final response = await client.get<Map<String, dynamic>>(Endpoints.eventDetail(eventId));
   final data = response.data;
   if (data == null) throw Exception('Event not found');
-  return Event.fromJson(data);
+  final event = Event.fromJson(data);
+  // Debug: log address-related fields so we can compare with cards.
+  // ignore: avoid_print
+  print(
+      'Detail event location for $eventId: city=${event.city}, country=${event.countryCode}, address=${event.address}, isVirtual=${event.isVirtual}');
+  return event;
 });

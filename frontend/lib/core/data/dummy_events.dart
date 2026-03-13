@@ -175,6 +175,8 @@ List<EventListItem> get dummyEventListItems => dummyEventsFull.map((e) {
     startUtc: e.startUtc,
     endUtc: e.endUtc,
     timezone: e.timezone,
+    lat: e.lat,
+    lng: e.lng,
     city: e.city,
     countryCode: e.countryCode,
     isVirtual: e.isVirtual,
