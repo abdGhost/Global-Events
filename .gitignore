@@ -1,0 +1,13 @@
+backend/.env
+backend/globalevents.db
+__pycache__/
+*.pyc
+.venv/
+.env
+frontend/build/
+frontend/.dart_tool/
+frontend/.flutter-plugins*
+frontend/.packages
+frontend/.idea/
+frontend/.vscode/
+

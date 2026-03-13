@@ -1,0 +1,186 @@
+import '../../models/event.dart';
+
+/// Set to false when you connect the real API/backend.
+const bool useDummyData = true;
+
+final _now = DateTime.now();
+final _utc = DateTime.utc(_now.year, _now.month, _now.day, 18, 0);
+final _utc2 = DateTime.utc(_now.year, _now.month, _now.day + 1, 20, 0);
+final _utc3 = DateTime.utc(_now.year, _now.month, _now.day + 3, 14, 0);
+final _utc4 = DateTime.utc(_now.year, _now.month, _now.day + 5, 19, 30);
+final _utc5 = DateTime.utc(_now.year, _now.month, _now.day + 7, 12, 0);
+final _created = DateTime.utc(_now.year, _now.month > 1 ? _now.month - 1 : 12, 1);
+
+List<Event> get dummyEventsFull => [
+  Event(
+    id: 'dummy-1',
+    title: 'Summer Music Festival 2025',
+    description: 'A full-day outdoor festival with live bands, food trucks, and art. Bring your friends and enjoy the best of local and international artists.',
+    startUtc: _utc,
+    endUtc: _utc2,
+    startLocal: _utc.toLocal(),
+    endLocal: _utc2.toLocal(),
+    timezone: 'America/New_York',
+    lat: 40.7128,
+    lng: -74.0060,
+    address: 'Central Park, New York',
+    city: 'New York',
+    countryCode: 'US',
+    isVirtual: false,
+    category: 'Music',
+    imageUrl: 'https://picsum.photos/800/400?random=1',
+    maxAttendees: 5000,
+    isApproved: true,
+    createdBy: 'user-1',
+    createdAt: _created,
+    viewsCount: 2340,
+    rsvpCount: 892,
+  ),
+  Event(
+    id: 'dummy-2',
+    title: 'Tech Meetup: Flutter & Dart',
+    description: 'Monthly meetup for Flutter developers. Talks, networking, and pizza. All skill levels welcome.',
+    startUtc: _utc2,
+    endUtc: _utc2.add(const Duration(hours: 3)),
+    startLocal: _utc2.toLocal(),
+    endLocal: _utc2.add(const Duration(hours: 3)).toLocal(),
+    timezone: 'America/Los_Angeles',
+    lat: 37.7749,
+    lng: -122.4194,
+    address: 'WeWork SOMA, San Francisco',
+    city: 'San Francisco',
+    countryCode: 'US',
+    isVirtual: false,
+    category: 'Tech',
+    imageUrl: 'https://picsum.photos/800/400?random=2',
+    maxAttendees: 120,
+    isApproved: true,
+    createdBy: 'user-2',
+    createdAt: _created,
+    viewsCount: 1560,
+    rsvpCount: 67,
+  ),
+  Event(
+    id: 'dummy-3',
+    title: 'Virtual Design Workshop',
+    description: 'Learn UI/UX best practices in this interactive online workshop. Figma and Miro will be used.',
+    startUtc: _utc3,
+    endUtc: _utc3.add(const Duration(hours: 2)),
+    startLocal: _utc3.toLocal(),
+    endLocal: _utc3.add(const Duration(hours: 2)).toLocal(),
+    timezone: 'UTC',
+    lat: null,
+    lng: null,
+    address: null,
+    city: null,
+    countryCode: null,
+    isVirtual: true,
+    category: 'Workshops',
+    imageUrl: 'https://picsum.photos/800/400?random=3',
+    maxAttendees: 200,
+    isApproved: true,
+    createdBy: 'user-3',
+    createdAt: _created,
+    viewsCount: 890,
+    rsvpCount: 134,
+  ),
+  Event(
+    id: 'dummy-4',
+    title: 'Neighborhood Food & Drink Fair',
+    description: 'Local restaurants and breweries in one place. Tastings, live cooking demos, and family activities.',
+    startUtc: _utc4,
+    endUtc: _utc4.add(const Duration(hours: 6)),
+    startLocal: _utc4.toLocal(),
+    endLocal: _utc4.add(const Duration(hours: 6)).toLocal(),
+    timezone: 'America/Chicago',
+    lat: 41.8781,
+    lng: -87.6298,
+    address: 'Grant Park',
+    city: 'Chicago',
+    countryCode: 'US',
+    isVirtual: false,
+    category: 'Food & Drink',
+    imageUrl: 'https://picsum.photos/800/400?random=4',
+    maxAttendees: 2000,
+    isApproved: true,
+    createdBy: 'user-1',
+    createdAt: _created,
+    viewsCount: 2100,
+    rsvpCount: 445,
+  ),
+  Event(
+    id: 'dummy-5',
+    title: 'Charity Run for Education',
+    description: '5K and 10K runs. All proceeds go to local schools. Medals and refreshments for all participants.',
+    startUtc: _utc5,
+    endUtc: _utc5.add(const Duration(hours: 4)),
+    startLocal: _utc5.toLocal(),
+    endLocal: _utc5.add(const Duration(hours: 4)).toLocal(),
+    timezone: 'America/New_York',
+    lat: 40.7484,
+    lng: -73.9857,
+    address: 'Bryant Park',
+    city: 'New York',
+    countryCode: 'US',
+    isVirtual: false,
+    category: 'Charity',
+    imageUrl: 'https://picsum.photos/800/400?random=5',
+    maxAttendees: 800,
+    isApproved: true,
+    createdBy: 'user-4',
+    createdAt: _created,
+    viewsCount: 1200,
+    rsvpCount: 312,
+  ),
+  Event(
+    id: 'dummy-6',
+    title: 'Startup Networking Night',
+    description: 'Connect with founders, investors, and developers. Pitches and casual networking.',
+    startUtc: _utc.add(const Duration(days: 2)),
+    endUtc: _utc.add(const Duration(days: 2, hours: 3)),
+    startLocal: _utc.add(const Duration(days: 2)).toLocal(),
+    endLocal: _utc.add(const Duration(days: 2, hours: 3)).toLocal(),
+    timezone: 'America/New_York',
+    lat: 40.7128,
+    lng: -74.0060,
+    address: 'Brooklyn Tech Hub',
+    city: 'New York',
+    countryCode: 'US',
+    isVirtual: false,
+    category: 'Networking',
+    imageUrl: 'https://picsum.photos/800/400?random=6',
+    maxAttendees: 150,
+    isApproved: true,
+    createdBy: 'user-2',
+    createdAt: _created,
+    viewsCount: 760,
+    rsvpCount: 89,
+  ),
+];
+
+/// Full events by id for detail screen.
+Event? getDummyEventById(String id) {
+  try {
+    return dummyEventsFull.firstWhere((e) => e.id == id);
+  } catch (_) {
+    return null;
+  }
+}
+
+/// List items for trending / nearby / search (same pool for dummy data).
+List<EventListItem> get dummyEventListItems => dummyEventsFull.map((e) {
+  return EventListItem(
+    id: e.id,
+    title: e.title,
+    startUtc: e.startUtc,
+    endUtc: e.endUtc,
+    timezone: e.timezone,
+    city: e.city,
+    countryCode: e.countryCode,
+    isVirtual: e.isVirtual,
+    category: e.category,
+    imageUrl: e.imageUrl,
+    rsvpCount: e.rsvpCount,
+    viewsCount: e.viewsCount,
+  );
+}).toList();
