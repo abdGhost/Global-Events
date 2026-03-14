@@ -10,6 +10,8 @@ class Endpoints {
   static const String eventsTrending = '/api/events/trending';
   static const String eventsSearch = '/api/events/search';
   static const String eventsNearby = '/api/events/nearby';
+  static const String eventsCreated = '/api/events/created';
+  static const String eventsRsvped = '/api/events/rsvped';
   static const String eventsCreate = '/api/events';
   static String eventDetail(String id) => '/api/events/$id';
   static String eventChatMessages(String id) => '/api/events/$id/chat/messages';

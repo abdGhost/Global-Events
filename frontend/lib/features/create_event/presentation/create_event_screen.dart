@@ -815,13 +815,21 @@ class _CreateEventScreenState extends ConsumerState<CreateEventScreen> {
                             foregroundColor: Colors.white,
                           ),
                           child: _isSubmitting
-                              ? const SizedBox(
-                                  height: 22,
-                                  width: 22,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: Colors.white,
-                                  ),
+                              ? Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    const SizedBox(
+                                      height: 22,
+                                      width: 22,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Text('Creating...', style: TextStyle(color: Colors.white, fontSize: 16)),
+                                  ],
                                 )
                               : const Text('Create event'),
                         ),

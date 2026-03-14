@@ -166,4 +166,46 @@ class EventListItem {
       viewsCount: json['views_count'] as int? ?? 0,
     );
   }
+
+  /// For persisting saved events (same shape as API / fromJson).
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'title': title,
+      'start_utc': startUtc.toUtc().toIso8601String(),
+      'end_utc': endUtc.toUtc().toIso8601String(),
+      'timezone': timezone,
+      'lat': lat,
+      'lng': lng,
+      'address': address,
+      'city': city,
+      'country_code': countryCode,
+      'is_virtual': isVirtual,
+      'category': category,
+      'image_url': imageUrl,
+      'rsvp_count': rsvpCount,
+      'views_count': viewsCount,
+    };
+  }
+}
+
+/// Convert full [Event] to list item for cards and saved list.
+EventListItem eventToListItem(Event event) {
+  return EventListItem(
+    id: event.id,
+    title: event.title,
+    startUtc: event.startUtc,
+    endUtc: event.endUtc,
+    timezone: event.timezone,
+    lat: event.lat,
+    lng: event.lng,
+    address: event.address,
+    city: event.city,
+    countryCode: event.countryCode,
+    isVirtual: event.isVirtual,
+    category: event.category,
+    imageUrl: event.imageUrl,
+    rsvpCount: event.rsvpCount,
+    viewsCount: event.viewsCount,
+  );
 }

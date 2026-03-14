@@ -9,6 +9,7 @@ import '../../../core/responsive/responsive.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../models/event.dart';
 import '../../../providers/event_detail_provider.dart';
+import '../../../providers/saved_events_provider.dart';
 
 class EventDetailScreen extends ConsumerWidget {
   const EventDetailScreen({super.key, required this.eventId});
@@ -18,10 +19,26 @@ class EventDetailScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final asyncEvent = ref.watch(eventDetailProvider(eventId));
+    final savedList = ref.watch(savedEventsProvider);
 
     return Scaffold(
       body: asyncEvent.when(
-        data: (event) => _EventDetailBody(event: event),
+        data: (event) {
+          final isSaved = savedList.any((e) => e.id == event.id);
+          final onSaveToggle = () async {
+            final notifier = ref.read(savedEventsProvider.notifier);
+            if (notifier.isSaved(event.id)) {
+              await notifier.removeEventById(event.id);
+            } else {
+              await notifier.addEvent(event);
+            }
+          };
+          return _EventDetailBody(
+            event: event,
+            isSaved: isSaved,
+            onSaveToggle: onSaveToggle,
+          );
+        },
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(
           child: Column(
@@ -40,26 +57,36 @@ class EventDetailScreen extends ConsumerWidget {
 }
 
 class _EventDetailBody extends StatelessWidget {
-  const _EventDetailBody({required this.event});
+  const _EventDetailBody({
+    required this.event,
+    required this.isSaved,
+    required this.onSaveToggle,
+  });
 
   final Event event;
+  final bool isSaved;
+  final VoidCallback onSaveToggle;
 
   @override
   Widget build(BuildContext context) {
-    return _EventDetailScroll(event: event);
-  }
-
-  String _formatCountdown(Duration d) {
-    if (d.inDays > 0) return '${d.inDays}d ${d.inHours % 24}h';
-    if (d.inHours > 0) return '${d.inHours}h ${d.inMinutes % 60}m';
-    return '${d.inMinutes}m';
+    return _EventDetailScroll(
+      event: event,
+      isSaved: isSaved,
+      onSaveToggle: onSaveToggle,
+    );
   }
 }
 
 class _EventDetailScroll extends StatefulWidget {
-  const _EventDetailScroll({required this.event});
+  const _EventDetailScroll({
+    required this.event,
+    required this.isSaved,
+    required this.onSaveToggle,
+  });
 
   final Event event;
+  final bool isSaved;
+  final VoidCallback onSaveToggle;
 
   @override
   State<_EventDetailScroll> createState() => _EventDetailScrollState();
@@ -83,6 +110,12 @@ class _EventDetailScrollState extends State<_EventDetailScroll> {
   void dispose() {
     _scroll.dispose();
     super.dispose();
+  }
+
+  static String _formatCountdown(Duration d) {
+    if (d.inDays > 0) return '${d.inDays}d ${d.inHours % 24}h';
+    if (d.inHours > 0) return '${d.inHours}h ${d.inMinutes % 60}m';
+    return '${d.inMinutes}m';
   }
 
   @override
@@ -152,6 +185,29 @@ class _EventDetailScrollState extends State<_EventDetailScroll> {
                 onPressed: () => context.pop(),
               ),
               actions: [
+                IconButton(
+                  icon: Container(
+                    padding: EdgeInsets.all(Responsive.value(context, 8)),
+                    decoration: BoxDecoration(
+                      color: _scrolled
+                          ? AppColors.primary.withValues(alpha: 0.10)
+                          : Colors.white.withValues(alpha: 0.18),
+                      borderRadius:
+                          BorderRadius.circular(Responsive.value(context, 12)),
+                      border: Border.all(
+                          color: Colors.white
+                              .withValues(alpha: _scrolled ? 0.0 : 0.10)),
+                    ),
+                    child: Icon(
+                      widget.isSaved
+                          ? Icons.bookmark
+                          : Icons.bookmark_border_outlined,
+                      size: Responsive.iconSize(context, 18),
+                      color: appBarFg,
+                    ),
+                  ),
+                  onPressed: widget.onSaveToggle,
+                ),
                 IconButton(
                   icon: Container(
                     padding: EdgeInsets.all(Responsive.value(context, 8)),
@@ -363,7 +419,7 @@ class _EventDetailScrollState extends State<_EventDetailScroll> {
                                         Text(
                                           countdown.isNegative
                                               ? 'Started'
-                                              : 'Starts in ${_EventDetailBody(event: e)._formatCountdown(countdown)}',
+                                              : 'Starts in ${_EventDetailScrollState._formatCountdown(countdown)}',
                                           style: Theme.of(context)
                                               .textTheme
                                               .bodySmall

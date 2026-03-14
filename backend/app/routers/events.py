@@ -13,6 +13,7 @@ from app.core.deps import get_current_user
 from app.core.utils.timezone import normalize_timezone
 from app.database import get_async_session
 from app.models.event import Event
+from app.models.rsvp import Rsvp
 from app.models.user import User
 from app.schemas.event import EventCreate, EventListItem, EventResponse, EventUpdate
 
@@ -136,6 +137,53 @@ async def get_nearby(
     result = await session.execute(stmt)
     events = result.scalars().all()
     # Optional: sort by distance (Haversine) in Python if needed
+    return [EventListItem.model_validate(e) for e in events]
+
+
+# ---------- My created events (auth required) ----------
+
+
+@router.get("/created", response_model=list[EventListItem])
+async def get_my_created_events(
+    limit: int = Query(50, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    session: AsyncSession = Depends(get_async_session),
+    current_user: User = Depends(get_current_user),
+) -> list[EventListItem]:
+    """Events created by the current user."""
+    stmt = (
+        select(Event)
+        .where(Event.created_by == current_user.id)
+        .order_by(Event.created_at.desc())
+        .offset(offset)
+        .limit(limit)
+    )
+    result = await session.execute(stmt)
+    events = result.scalars().all()
+    return [EventListItem.model_validate(e) for e in events]
+
+
+# ---------- My RSVPed events (auth required) ----------
+
+
+@router.get("/rsvped", response_model=list[EventListItem])
+async def get_my_rsvped_events(
+    limit: int = Query(50, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    session: AsyncSession = Depends(get_async_session),
+    current_user: User = Depends(get_current_user),
+) -> list[EventListItem]:
+    """Events the current user has RSVPed to."""
+    stmt = (
+        select(Event)
+        .join(Rsvp, Rsvp.event_id == Event.id)
+        .where(Rsvp.user_id == current_user.id)
+        .order_by(Event.start_utc.asc())
+        .offset(offset)
+        .limit(limit)
+    )
+    result = await session.execute(stmt)
+    events = result.scalars().all()
     return [EventListItem.model_validate(e) for e in events]
 
 

@@ -15,6 +15,7 @@ import '../../features/home/presentation/home_screen.dart';
 import '../../features/map/presentation/map_screen.dart';
 import '../../features/map/presentation/location_picker_screen.dart';
 import '../../features/onboarding/onboarding_screen.dart';
+import '../../features/profile/presentation/profile_events_screen.dart';
 import '../../features/profile/presentation/profile_screen.dart';
 import '../../features/search/presentation/search_screen.dart';
 import '../../features/splash/splash_screen.dart';
@@ -100,6 +101,18 @@ GoRouter createAppRouter() {
           final id = state.pathParameters['id']!;
           return EventChatScreen(eventId: id);
         },
+      ),
+      GoRoute(
+        path: '/profile/created',
+        builder: (_, __) => const ProfileEventsScreen(type: ProfileEventsType.created),
+      ),
+      GoRoute(
+        path: '/profile/rsvped',
+        builder: (_, __) => const ProfileEventsScreen(type: ProfileEventsType.rsvped),
+      ),
+      GoRoute(
+        path: '/profile/saved',
+        builder: (_, __) => const ProfileEventsScreen(type: ProfileEventsType.saved),
       ),
       GoRoute(
         path: '/create-event',

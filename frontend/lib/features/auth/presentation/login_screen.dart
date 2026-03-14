@@ -280,23 +280,27 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               ),
                             ).animate().fadeIn(delay: 300.ms),
                             const SizedBox(height: 20),
-                            FilledButton(
-                              onPressed: _isLoading ? null : _handleLogin,
-                              style: FilledButton.styleFrom(
-                                backgroundColor: primary,
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(vertical: 16),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                                elevation: 0,
+                            SizedBox(
+                              height: 52,
+                              width: double.infinity,
+                              child: Material(
+                                color: primary,
+                                borderRadius: BorderRadius.circular(14),
+                                child: InkWell(
+                                  onTap: _isLoading ? null : _handleLogin,
+                                  borderRadius: BorderRadius.circular(14),
+                                  child: Center(
+                                    child: _isLoading
+                                        ? const SizedBox(
+                                            height: 24,
+                                            width: 24,
+                                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                          )
+                                        : const Text('Sign In', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600)),
+                                  ),
+                                ),
                               ),
-                              child: _isLoading
-                                  ? const SizedBox(
-                                      height: 20,
-                                      width: 20,
-                                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                                    )
-                                  : const Text('Sign In'),
-                            ).animate().fadeIn(delay: 340.ms).slideY(begin: 0.08, end: 0, curve: Curves.easeOut),
+                            ),
                             const SizedBox(height: 20),
                             Row(
                               children: [

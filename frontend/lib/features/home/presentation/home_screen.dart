@@ -25,11 +25,47 @@ class HomeScreen extends ConsumerStatefulWidget {
   ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
 
+/// Filter state applied to trending events (category, virtual, country).
+class _HomeFilterState {
+  const _HomeFilterState({
+    this.category,
+    this.isVirtual,
+    this.countryCode,
+  });
+  final String? category;
+  final bool? isVirtual;
+  final String? countryCode;
+}
+
 class _HomeScreenState extends ConsumerState<HomeScreen> {
-  int _selectedCategoryIndex = 0;
+  String? _filterCategory;
+  bool? _filterVirtual;
+  String? _filterCountry;
   final _scrollController = ScrollController();
   bool _isScrolled = false;
   bool _isRequestingLocation = false;
+
+  List<EventListItem> _applyFilters(List<EventListItem> events) {
+    var list = events;
+    if (_filterCategory != null && _filterCategory!.isNotEmpty) {
+      list = list
+          .where((e) =>
+              e.category != null &&
+              e.category!.toLowerCase() == _filterCategory!.toLowerCase())
+          .toList();
+    }
+    if (_filterVirtual != null) {
+      list = list.where((e) => e.isVirtual == _filterVirtual).toList();
+    }
+    if (_filterCountry != null && _filterCountry!.isNotEmpty) {
+      list = list
+          .where((e) =>
+              e.countryCode != null &&
+              e.countryCode!.toLowerCase() == _filterCountry!.toLowerCase())
+          .toList();
+    }
+    return list;
+  }
 
   @override
   void initState() {
@@ -63,8 +99,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             ),
           );
 
-    // Derive dynamic categories from currently available events so we only
-    // show categories that actually exist.
+    // Derive dynamic categories from currently available events; "All" first.
     final categories = trending.maybeWhen(
       data: (events) {
         final set = <String>{};
@@ -75,14 +110,29 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           }
         }
         final list = set.toList()..sort();
-        return list;
+        return ['All', ...list];
       },
-      orElse: () => <String>[],
+      orElse: () => <String>['All'],
     );
-    final hasCategories = categories.isNotEmpty;
-    final selectedCategoryIndex = hasCategories
-        ? _selectedCategoryIndex.clamp(0, categories.length - 1)
-        : 0;
+    final hasCategories = categories.length > 1;
+    final selectedCategoryIndex = _filterCategory == null
+        ? 0
+        : (categories.indexOf(_filterCategory!).clamp(0, categories.length - 1));
+
+    final countries = trending.maybeWhen(
+      data: (events) {
+        final set = <String>{};
+        for (final e in events) {
+          final c = e.countryCode?.trim();
+          if (c != null && c.isNotEmpty) {
+            set.add(c);
+          }
+        }
+        final list = set.toList()..sort();
+        return ['All', ...list];
+      },
+      orElse: () => <String>['All'],
+    );
 
     return Scaffold(
       body: Stack(
@@ -173,7 +223,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           size: Responsive.iconSize(context, compact ? 16 : 18),
                           color: AppColors.primary),
                     ),
-                    onPressed: () => _showFilterSheet(context),
+                    onPressed: () => _showFilterSheet(
+                        context,
+                        categories: categories,
+                        countries: countries,
+                        initial: _HomeFilterState(
+                          category: _filterCategory,
+                          isVirtual: _filterVirtual,
+                          countryCode: _filterCountry,
+                        ),
+                      ),
                   ),
                   SizedBox(width: Responsive.horizontalPadding(context) - 4),
                 ],
@@ -185,20 +244,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   data: (events) {
                     if (events.isEmpty) return const SizedBox.shrink();
 
-                    // Apply category filter from chips (home screen).
-                    List<EventListItem> visible = events;
-                    if (hasCategories) {
-                      final selectedCategory = categories[selectedCategoryIndex];
-                      final filtered = events
-                          .where(
-                            (e) =>
-                                e.category != null &&
-                                e.category!.toLowerCase() ==
-                                    selectedCategory.toLowerCase(),
-                          )
-                          .toList();
-                      visible = filtered.isEmpty ? events : filtered;
-                    }
+                    final visible = _applyFilters(events);
+                    if (visible.isEmpty) return const SizedBox.shrink();
 
                     // If there is only a single trending event, just show one
                     // large card without repeating it in a carousel. When
@@ -303,8 +350,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                               child: Material(
                                 color: Colors.transparent,
                                 child: InkWell(
-                                  onTap: () => setState(
-                                      () => _selectedCategoryIndex = i),
+                                  onTap: () => setState(() =>
+                                      _filterCategory =
+                                          i == 0 ? null : categories[i]),
                                   borderRadius: BorderRadius.circular(
                                     Responsive.value(
                                         context, compact ? 18 : 20),
@@ -573,10 +621,29 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                               MaterialTapTargetSize
                                                   .shrinkWrap,
                                         ),
-                                        child: const Text(
-                                          'Allow location',
-                                          style: TextStyle(fontSize: 12),
-                                        ),
+                                        child: _isRequestingLocation
+                                            ? Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  SizedBox(
+                                                    height: 14,
+                                                    width: 14,
+                                                    child: CircularProgressIndicator(
+                                                      strokeWidth: 2,
+                                                      color: Colors.white,
+                                                    ),
+                                                  ),
+                                                  const SizedBox(width: 8),
+                                                  const Text(
+                                                    'Getting location...',
+                                                    style: TextStyle(fontSize: 12),
+                                                  ),
+                                                ],
+                                              )
+                                            : const Text(
+                                                'Allow location',
+                                                style: TextStyle(fontSize: 12),
+                                              ),
                                       ),
                                     ),
                                   ],
@@ -820,6 +887,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       ),
                     );
                   }
+                  final visible = _applyFilters(events);
                   return SliverPadding(
                     padding: EdgeInsets.fromLTRB(
                         Responsive.horizontalPadding(context),
@@ -832,14 +900,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           return Padding(
                             padding: EdgeInsets.only(
                                 bottom: Responsive.spacing(context, 14)),
-                            child: EventCard(event: events[i]),
+                            child: EventCard(event: visible[i]),
                           )
                               .animate()
                               .fadeIn(delay: Duration(milliseconds: 50 * i))
                               .slideY(
                                   begin: 0.03, end: 0, curve: Curves.easeOut);
                         },
-                        childCount: events.length,
+                        childCount: visible.length,
                       ),
                     ),
                   );
@@ -898,96 +966,261 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-  void _showFilterSheet(BuildContext context) {
-    showModalBottomSheet(
+  void _showFilterSheet(
+    BuildContext context, {
+    required List<String> categories,
+    required List<String> countries,
+    required _HomeFilterState initial,
+  }) {
+    showModalBottomSheet<_HomeFilterState>(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (ctx) {
-        final bottomNavHeight = 80.0;
-        final bottomPadding = MediaQuery.paddingOf(ctx).bottom + bottomNavHeight;
+        // Inset so sheet bottom meets the top of the nav bar (no gap).
+        const kBottomNavHeight = 56.0;
+        final bottomInset = MediaQuery.paddingOf(ctx).bottom + kBottomNavHeight;
         return Padding(
-          padding: EdgeInsets.only(bottom: bottomPadding),
-          child: Container(
-            width: MediaQuery.sizeOf(ctx).width,
-            decoration: BoxDecoration(
-              color: Theme.of(ctx).colorScheme.surface,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-              border: Border.all(
-                color: Colors.white.withValues(alpha: 0.08),
-                width: 1,
+          padding: EdgeInsets.only(bottom: bottomInset),
+          child: DraggableScrollableSheet(
+            initialChildSize: 0.5,
+            minChildSize: 0.35,
+            maxChildSize: 0.85,
+            builder: (_, scrollController) => Container(
+              width: MediaQuery.sizeOf(ctx).width,
+              decoration: BoxDecoration(
+                color: Theme.of(ctx).colorScheme.surface,
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(20)),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.08),
+                  width: 1,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.2),
+                    blurRadius: 20,
+                    offset: const Offset(0, -4),
+                  ),
+                ],
               ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.2),
-                  blurRadius: 20,
-                  offset: const Offset(0, -4),
-                ),
-              ],
-            ),
-            child: SafeArea(
-              top: true,
-              bottom: false,
-              child: Padding(
-                padding: EdgeInsets.fromLTRB(
-                  Responsive.horizontalPadding(ctx) + 4,
-                  Responsive.horizontalPadding(ctx) + 4,
-                  Responsive.horizontalPadding(ctx) + 4,
-                  Responsive.spacing(ctx, 16),
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Text('Filters',
-                        style: Theme.of(ctx)
-                            .textTheme
-                            .titleLarge
-                            ?.copyWith(fontWeight: FontWeight.w700)),
-                    SizedBox(height: Responsive.spacing(ctx, 20)),
-                    ListTile(
-                        title: const Text('Date'),
-                        trailing: FaIcon(FontAwesomeIcons.calendarDays,
-                            size: Responsive.iconSize(ctx, 20))),
-                    ListTile(
-                        title: const Text('Category'),
-                        trailing: FaIcon(FontAwesomeIcons.tags,
-                            size: Responsive.iconSize(ctx, 20))),
-                    ListTile(
-                        title: const Text('Virtual / In-person'),
-                        trailing: FaIcon(FontAwesomeIcons.arrowsLeftRight,
-                            size: Responsive.iconSize(ctx, 20))),
-                    ListTile(
-                        title: const Text('Free / Paid'),
-                        trailing: FaIcon(FontAwesomeIcons.dollarSign,
-                            size: Responsive.iconSize(ctx, 20))),
-                    ListTile(
-                        title: const Text('Country'),
-                        trailing: FaIcon(FontAwesomeIcons.globe,
-                            size: Responsive.iconSize(ctx, 20))),
-                    SizedBox(height: Responsive.spacing(ctx, 24)),
-                    FilledButton(
-                      onPressed: () => Navigator.pop(ctx),
-                      style: FilledButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        padding: EdgeInsets.symmetric(
-                          vertical: Responsive.value(
-                              ctx, Responsive.isCompact(ctx) ? 12 : 14),
-                        ),
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        shape: RoundedRectangleBorder(
-                            borderRadius:
-                                BorderRadius.circular(Responsive.value(ctx, 14))),
-                      ),
-                      child: const Text('Apply'),
-                    ),
-                  ],
+              child: SafeArea(
+                top: true,
+                bottom: false,
+                child: _FilterSheetContent(
+                  categories: categories,
+                  countries: countries,
+                  initial: initial,
+                  scrollController: scrollController,
                 ),
               ),
             ),
           ),
         );
       },
+    ).then((result) {
+      if (result != null && mounted) {
+        setState(() {
+          _filterCategory = result.category;
+          _filterVirtual = result.isVirtual;
+          _filterCountry =
+              result.countryCode == null || result.countryCode == 'All'
+                  ? null
+                  : result.countryCode;
+        });
+      }
+    });
+  }
+}
+
+class _FilterSheetContent extends StatefulWidget {
+  const _FilterSheetContent({
+    required this.categories,
+    required this.countries,
+    required this.initial,
+    required this.scrollController,
+  });
+
+  final List<String> categories;
+  final List<String> countries;
+  final _HomeFilterState initial;
+  final ScrollController scrollController;
+
+  @override
+  State<_FilterSheetContent> createState() => _FilterSheetContentState();
+}
+
+class _FilterSheetContentState extends State<_FilterSheetContent> {
+  late String? _category;
+  late bool? _virtual;
+  late String? _country;
+
+  @override
+  void initState() {
+    super.initState();
+    _category = widget.initial.category;
+    _virtual = widget.initial.isVirtual;
+    _country = widget.initial.countryCode;
+    if (_country == null || _country == '') {
+      _country = 'All';
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ctx = context;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SizedBox(height: Responsive.spacing(ctx, 12)),
+        Container(
+          width: 40,
+          height: 4,
+          decoration: BoxDecoration(
+            color: Colors.grey.shade400,
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
+        SizedBox(height: Responsive.spacing(ctx, 16)),
+        Padding(
+          padding: EdgeInsets.symmetric(horizontal: Responsive.horizontalPadding(ctx) + 4),
+          child: Text('Filters',
+              style: Theme.of(ctx)
+                  .textTheme
+                  .titleLarge
+                  ?.copyWith(fontWeight: FontWeight.w700)),
+        ),
+        SizedBox(height: Responsive.spacing(ctx, 20)),
+        Expanded(
+          child: ListView(
+            controller: widget.scrollController,
+            padding: EdgeInsets.fromLTRB(
+              Responsive.horizontalPadding(ctx) + 4,
+              0,
+              Responsive.horizontalPadding(ctx) + 4,
+              Responsive.spacing(ctx, 16),
+            ),
+            children: [
+              _section(ctx, 'Category', FontAwesomeIcons.tags, [
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: widget.categories.map((c) {
+                    final isAll = c == 'All';
+                    final selected =
+                        (_category == null && isAll) || _category == c;
+                    return ChoiceChip(
+                      label: Text(c),
+                      selected: selected,
+                      onSelected: (_) {
+                        setState(() => _category = isAll ? null : c);
+                      },
+                    );
+                  }).toList(),
+                ),
+              ]),
+              _section(ctx, 'Virtual / In-person', FontAwesomeIcons.arrowsLeftRight, [
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    ChoiceChip(
+                      label: const Text('All'),
+                      selected: _virtual == null,
+                      onSelected: (_) => setState(() => _virtual = null),
+                    ),
+                    ChoiceChip(
+                      label: const Text('Virtual'),
+                      selected: _virtual == true,
+                      onSelected: (_) => setState(() => _virtual = true),
+                    ),
+                    ChoiceChip(
+                      label: const Text('In-person'),
+                      selected: _virtual == false,
+                      onSelected: (_) => setState(() => _virtual = false),
+                    ),
+                  ],
+                ),
+              ]),
+              _section(ctx, 'Country', FontAwesomeIcons.globe, [
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: widget.countries.map((c) {
+                    final isAll = c == 'All';
+                    final selected =
+                        (_country == 'All' && isAll) || _country == c;
+                    return ChoiceChip(
+                      label: Text(c),
+                      selected: selected,
+                      onSelected: (_) {
+                        setState(() => _country = isAll ? 'All' : c);
+                      },
+                    );
+                  }).toList(),
+                ),
+              ]),
+              SizedBox(height: Responsive.spacing(ctx, 24)),
+              FilledButton(
+                onPressed: () {
+                  Navigator.pop<_HomeFilterState>(
+                    context,
+                    _HomeFilterState(
+                      category: _category,
+                      isVirtual: _virtual,
+                      countryCode: _country == 'All' ? null : _country,
+                    ),
+                  );
+                },
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  padding: EdgeInsets.symmetric(
+                    vertical:
+                        Responsive.value(ctx, Responsive.isCompact(ctx) ? 12 : 14),
+                  ),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  shape: RoundedRectangleBorder(
+                    borderRadius:
+                        BorderRadius.circular(Responsive.value(ctx, 14)),
+                  ),
+                ),
+                child: const Text('Apply'),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _section(
+    BuildContext ctx,
+    String title,
+    IconData icon,
+    List<Widget> children,
+  ) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: Responsive.spacing(ctx, 20)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              FaIcon(icon, size: Responsive.iconSize(ctx, 18), color: Colors.grey.shade600),
+              SizedBox(width: Responsive.spacing(ctx, 8)),
+              Text(
+                title,
+                style: Theme.of(ctx).textTheme.titleSmall?.copyWith(
+                      color: Colors.grey.shade700,
+                      fontWeight: FontWeight.w600,
+                    ),
+              ),
+            ],
+          ),
+          SizedBox(height: Responsive.spacing(ctx, 10)),
+          ...children,
+        ],
+      ),
     );
   }
 }

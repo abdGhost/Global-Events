@@ -318,23 +318,27 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                               },
                             ).animate().fadeIn(delay: 320.ms).slideX(begin: 0.06, end: 0, curve: Curves.easeOut),
                             const SizedBox(height: 22),
-                            FilledButton(
-                              onPressed: _isLoading ? null : _handleRegister,
-                              style: FilledButton.styleFrom(
-                                backgroundColor: primary,
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(vertical: 16),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                                elevation: 0,
+                            SizedBox(
+                              height: 52,
+                              width: double.infinity,
+                              child: Material(
+                                color: primary,
+                                borderRadius: BorderRadius.circular(14),
+                                child: InkWell(
+                                  onTap: _isLoading ? null : _handleRegister,
+                                  borderRadius: BorderRadius.circular(14),
+                                  child: Center(
+                                    child: _isLoading
+                                        ? const SizedBox(
+                                            height: 24,
+                                            width: 24,
+                                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                          )
+                                        : const Text('Sign Up', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600)),
+                                  ),
+                                ),
                               ),
-                              child: _isLoading
-                                  ? const SizedBox(
-                                      height: 20,
-                                      width: 20,
-                                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                                    )
-                                  : const Text('Sign Up'),
-                            ).animate().fadeIn(delay: 380.ms).slideY(begin: 0.08, end: 0, curve: Curves.easeOut),
+                            ),
                             const SizedBox(height: 20),
                             Row(
                               children: [
