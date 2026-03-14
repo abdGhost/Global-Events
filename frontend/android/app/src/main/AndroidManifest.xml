@@ -1,6 +1,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <!-- Required for API calls (e.g. Render backend). -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Required for "Enable location" and map; runtime permission is requested in app. -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
     <application
         android:label="Global Gather"
         android:name="${applicationName}"

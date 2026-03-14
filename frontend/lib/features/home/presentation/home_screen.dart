@@ -5,7 +5,6 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:glass_kit/glass_kit.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/location/location_service.dart';
@@ -458,7 +457,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
                                     Text(
-                                      'Enable location to see events near you',
+                                      'Allow location to see events near you',
                                       style: Theme.of(context)
                                           .textTheme
                                           .bodyMedium
@@ -473,7 +472,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                         height:
                                             Responsive.spacing(context, 4)),
                                     Text(
-                                      'Turn on location services or use the map to explore nearby events.',
+                                      'Tap the button below—we\'ll ask for permission. Or use the map to pick a location.',
                                       style: Theme.of(context)
                                           .textTheme
                                           .bodySmall
@@ -507,7 +506,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                                       .showSnackBar(
                                                     const SnackBar(
                                                       content: Text(
-                                                          'Please enable location services in your browser or device settings.'),
+                                                          'Allow location when prompted, or turn on Location in device settings.'),
+                                                      duration: Duration(seconds: 4),
                                                     ),
                                                   );
                                                   return;
@@ -546,7 +546,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                                   .shrinkWrap,
                                         ),
                                         child: const Text(
-                                          'Enable location',
+                                          'Allow location',
                                           style: TextStyle(fontSize: 12),
                                         ),
                                       ),
@@ -874,62 +874,92 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (ctx) => GlassContainer.frostedGlass(
-        width: MediaQuery.sizeOf(ctx).width,
-        child: SafeArea(
-          child: Padding(
-            padding: EdgeInsets.all(Responsive.horizontalPadding(ctx) + 4),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text('Filters',
-                    style: Theme.of(ctx)
-                        .textTheme
-                        .titleLarge
-                        ?.copyWith(fontWeight: FontWeight.w700)),
-                SizedBox(height: Responsive.spacing(ctx, 20)),
-                ListTile(
-                    title: const Text('Date'),
-                    trailing: FaIcon(FontAwesomeIcons.calendarDays,
-                        size: Responsive.iconSize(ctx, 20))),
-                ListTile(
-                    title: const Text('Category'),
-                    trailing: FaIcon(FontAwesomeIcons.tags,
-                        size: Responsive.iconSize(ctx, 20))),
-                ListTile(
-                    title: const Text('Virtual / In-person'),
-                    trailing: FaIcon(FontAwesomeIcons.arrowsLeftRight,
-                        size: Responsive.iconSize(ctx, 20))),
-                ListTile(
-                    title: const Text('Free / Paid'),
-                    trailing: FaIcon(FontAwesomeIcons.dollarSign,
-                        size: Responsive.iconSize(ctx, 20))),
-                ListTile(
-                    title: const Text('Country'),
-                    trailing: FaIcon(FontAwesomeIcons.globe,
-                        size: Responsive.iconSize(ctx, 20))),
-                SizedBox(height: Responsive.spacing(ctx, 24)),
-                FilledButton(
-                  onPressed: () => Navigator.pop(ctx),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    padding: EdgeInsets.symmetric(
-                      vertical: Responsive.value(
-                          ctx, Responsive.isCompact(ctx) ? 12 : 14),
-                    ),
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    shape: RoundedRectangleBorder(
-                        borderRadius:
-                            BorderRadius.circular(Responsive.value(ctx, 14))),
-                  ),
-                  child: const Text('Apply'),
+      isScrollControlled: true,
+      builder: (ctx) {
+        final bottomNavHeight = 80.0;
+        final bottomPadding = MediaQuery.paddingOf(ctx).bottom + bottomNavHeight;
+        return Padding(
+          padding: EdgeInsets.only(bottom: bottomPadding),
+          child: Container(
+            width: MediaQuery.sizeOf(ctx).width,
+            decoration: BoxDecoration(
+              color: Theme.of(ctx).colorScheme.surface,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.08),
+                width: 1,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.2),
+                  blurRadius: 20,
+                  offset: const Offset(0, -4),
                 ),
               ],
             ),
+            child: SafeArea(
+              top: true,
+              bottom: false,
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(
+                  Responsive.horizontalPadding(ctx) + 4,
+                  Responsive.horizontalPadding(ctx) + 4,
+                  Responsive.horizontalPadding(ctx) + 4,
+                  Responsive.spacing(ctx, 16),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text('Filters',
+                        style: Theme.of(ctx)
+                            .textTheme
+                            .titleLarge
+                            ?.copyWith(fontWeight: FontWeight.w700)),
+                    SizedBox(height: Responsive.spacing(ctx, 20)),
+                    ListTile(
+                        title: const Text('Date'),
+                        trailing: FaIcon(FontAwesomeIcons.calendarDays,
+                            size: Responsive.iconSize(ctx, 20))),
+                    ListTile(
+                        title: const Text('Category'),
+                        trailing: FaIcon(FontAwesomeIcons.tags,
+                            size: Responsive.iconSize(ctx, 20))),
+                    ListTile(
+                        title: const Text('Virtual / In-person'),
+                        trailing: FaIcon(FontAwesomeIcons.arrowsLeftRight,
+                            size: Responsive.iconSize(ctx, 20))),
+                    ListTile(
+                        title: const Text('Free / Paid'),
+                        trailing: FaIcon(FontAwesomeIcons.dollarSign,
+                            size: Responsive.iconSize(ctx, 20))),
+                    ListTile(
+                        title: const Text('Country'),
+                        trailing: FaIcon(FontAwesomeIcons.globe,
+                            size: Responsive.iconSize(ctx, 20))),
+                    SizedBox(height: Responsive.spacing(ctx, 24)),
+                    FilledButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        padding: EdgeInsets.symmetric(
+                          vertical: Responsive.value(
+                              ctx, Responsive.isCompact(ctx) ? 12 : 14),
+                        ),
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        shape: RoundedRectangleBorder(
+                            borderRadius:
+                                BorderRadius.circular(Responsive.value(ctx, 14))),
+                      ),
+                      child: const Text('Apply'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }
