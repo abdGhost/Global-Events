@@ -66,20 +66,43 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         context.replace('/');
       }
     } on DioException catch (e) {
+      String msg;
       final data = e.response?.data;
-      final msg = data is Map && data['detail'] is String
-          ? data['detail'] as String
-          : 'Unable to sign up. Please try again.';
+      if (data is Map) {
+        final detail = data['detail'];
+        if (detail is String) {
+          msg = detail;
+        } else if (detail is List && detail.isNotEmpty) {
+          final parts = <String>[];
+          for (final item in detail) {
+            if (item is Map && item['msg'] != null) {
+              parts.add(item['msg'].toString());
+            }
+          }
+          msg = parts.isEmpty ? 'Invalid input. Please check your email and password.' : parts.join(' ');
+        } else {
+          msg = e.response?.statusCode != null
+              ? 'Server error (${e.response!.statusCode}). Try again.'
+              : (e.message ?? 'Unable to sign up. Please try again.');
+        }
+      } else {
+        // No response: connection error, timeout, or unreachable (e.g. Render cold start).
+        msg = e.message ?? e.type.toString();
+        if (msg.isEmpty) msg = 'Network error. Check internet or try again in a moment.';
+      }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(msg)),
+          SnackBar(content: Text(msg), duration: const Duration(seconds: 5)),
         );
       }
-    } catch (_) {
+    } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Something went wrong while signing up.')),
+          SnackBar(
+            content: Text('Error: ${e.toString()}'),
+            duration: const Duration(seconds: 5),
+          ),
         );
       }
     } finally {

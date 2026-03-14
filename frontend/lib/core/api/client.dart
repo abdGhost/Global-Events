@@ -5,10 +5,11 @@ import '../timezone_service.dart';
 
 /// Global Dio instance with base URL and X-Timezone header.
 Dio createApiClient({String? authToken}) {
+  // Render free tier cold-starts can take 30–60s; use longer timeouts for mobile.
   final dio = Dio(BaseOptions(
     baseUrl: kApiBaseUrl,
-    connectTimeout: const Duration(seconds: 15),
-    receiveTimeout: const Duration(seconds: 15),
+    connectTimeout: const Duration(seconds: 60),
+    receiveTimeout: const Duration(seconds: 60),
     headers: {
       'Accept': 'application/json',
       'Content-Type': 'application/json',
