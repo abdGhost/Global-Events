@@ -1,6 +1,7 @@
 import 'dart:ui';
 
 import 'package:carousel_slider/carousel_slider.dart';
+import 'package:dio/dio.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -13,6 +14,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/storage/app_storage.dart';
 import '../../../models/event.dart';
 import '../../../providers/nearby_events_provider.dart';
+import '../../../core/api/client.dart';
 import '../../../providers/trending_events_provider.dart';
 import '../../../providers/user_location_provider.dart';
 import 'widgets/event_card.dart';
@@ -65,6 +67,55 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           .toList();
     }
     return list;
+  }
+
+  /// Shown when the API returned events but home filters hide all of them.
+  Widget _filterMismatchBanner(BuildContext context) {
+    final pad = Responsive.horizontalPadding(context);
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: pad),
+      child: Material(
+        color: Theme.of(context)
+            .colorScheme
+            .surfaceContainerHighest
+            .withValues(alpha: 0.45),
+        borderRadius: BorderRadius.circular(14),
+        child: Padding(
+          padding: EdgeInsets.symmetric(
+            horizontal: Responsive.spacing(context, 12),
+            vertical: Responsive.spacing(context, 10),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.filter_alt_off_rounded,
+                size: Responsive.iconSize(context, 20),
+                color: AppColors.primary,
+              ),
+              SizedBox(width: Responsive.spacing(context, 12)),
+              Expanded(
+                child: Text(
+                  'No events match your filters. Clear to see the full list.',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Colors.white.withValues(alpha: 0.85),
+                        height: 1.35,
+                      ),
+                ),
+              ),
+              TextButton(
+                onPressed: () => setState(() {
+                  _filterCategory = null;
+                  _filterVirtual = null;
+                  _filterCountry = null;
+                }),
+                child: const Text('Clear'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -245,7 +296,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     if (events.isEmpty) return const SizedBox.shrink();
 
                     final visible = _applyFilters(events);
-                    if (visible.isEmpty) return const SizedBox.shrink();
+                    if (visible.isEmpty) {
+                      return _filterMismatchBanner(context);
+                    }
 
                     // If there is only a single trending event, just show one
                     // large card without repeating it in a carousel. When
@@ -307,7 +360,43 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       ),
                     ),
                   ),
-                  error: (_, __) => const SizedBox.shrink(),
+                  error: (err, _) => Padding(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: Responsive.horizontalPadding(context),
+                    ),
+                    child: Material(
+                      color: Theme.of(context)
+                          .colorScheme
+                          .surfaceContainerHighest
+                          .withValues(alpha: 0.45),
+                      borderRadius: BorderRadius.circular(14),
+                      child: Padding(
+                        padding: EdgeInsets.all(Responsive.spacing(context, 14)),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              err is DioException
+                                  ? userMessageFromDioException(err)
+                                  : 'Could not load trending events.',
+                              textAlign: TextAlign.center,
+                              style: Theme.of(context).textTheme.bodyMedium,
+                            ),
+                            SizedBox(height: Responsive.spacing(context, 10)),
+                            FilledButton.icon(
+                              onPressed: () =>
+                                  ref.invalidate(trendingEventsProvider),
+                              icon: const Icon(Icons.refresh),
+                              label: const Text('Retry'),
+                              style: FilledButton.styleFrom(
+                                backgroundColor: AppColors.primary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
               ),
               SliverToBoxAdapter(
@@ -871,7 +960,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                               ),
                               SizedBox(height: Responsive.spacing(context, 6)),
                               Text(
-                                'Try exploring by category or zooming the map to discover more.',
+                                'This list comes from the server (not your account). Tap Retry after a moment, or ask your team to load demo events on the API if the database is new.',
                                 style: Theme.of(context)
                                     .textTheme
                                     .bodySmall
@@ -881,6 +970,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                     ),
                                 textAlign: TextAlign.center,
                               ),
+                              SizedBox(height: Responsive.spacing(context, 16)),
+                              FilledButton.icon(
+                                onPressed: () =>
+                                    ref.invalidate(trendingEventsProvider),
+                                icon: const Icon(Icons.refresh),
+                                label: const Text('Retry'),
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: AppColors.primary,
+                                ),
+                              ),
                             ],
                           ),
                         ),
@@ -888,6 +987,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     );
                   }
                   final visible = _applyFilters(events);
+                  if (visible.isEmpty) {
+                    return SliverToBoxAdapter(
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: Responsive.horizontalPadding(context),
+                        ),
+                        child: _filterMismatchBanner(context),
+                      ),
+                    );
+                  }
                   return SliverPadding(
                     padding: EdgeInsets.fromLTRB(
                         Responsive.horizontalPadding(context),

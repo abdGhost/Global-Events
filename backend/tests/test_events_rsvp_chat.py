@@ -3,6 +3,10 @@ from uuid import UUID
 
 import pytest
 from httpx import AsyncClient
+from sqlalchemy import delete
+
+from app.database import async_session_maker
+from app.models.event import Event
 
 
 async def _auth_header(client: AsyncClient, email: str) -> dict[str, str]:
@@ -48,6 +52,42 @@ async def test_create_event_and_trending(client: AsyncClient) -> None:
     event_id = event["id"]
 
     # Trending should include the event
+    resp_trending = await client.get("/api/events/trending")
+    assert resp_trending.status_code == 200
+    ids = [e["id"] for e in resp_trending.json()]
+    assert event_id in ids
+
+
+@pytest.mark.asyncio
+async def test_trending_falls_back_when_only_past_events(client: AsyncClient) -> None:
+    """Stale seed / all-ended DB should still return popular rows from trending."""
+    async with async_session_maker() as session:
+        await session.execute(delete(Event))
+        await session.commit()
+
+    headers = await _auth_header(client, "pastonly@example.com")
+    start = _now_utc_offset(-72)
+    end = _now_utc_offset(-70)
+    body = {
+        "title": "Past Trending Fallback",
+        "description": "Ended event should still appear when nothing is upcoming",
+        "start_local": start.isoformat(),
+        "end_local": end.isoformat(),
+        "timezone": "UTC",
+        "lat": 1.0,
+        "lng": 103.0,
+        "address": None,
+        "city": "Singapore",
+        "country_code": "SG",
+        "is_virtual": False,
+        "category": "Meetup",
+        "image_url": None,
+        "max_attendees": 50,
+    }
+    resp = await client.post("/api/events", headers=headers, json=body)
+    assert resp.status_code == 201
+    event_id = resp.json()["id"]
+
     resp_trending = await client.get("/api/events/trending")
     assert resp_trending.status_code == 200
     ids = [e["id"] for e in resp_trending.json()]

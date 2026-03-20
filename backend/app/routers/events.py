@@ -33,17 +33,34 @@ async def get_trending(
     offset: int = Query(0, ge=0),
     session: AsyncSession = Depends(get_async_session),
 ) -> list[EventListItem]:
-    """High rsvp/views, recent events (global)."""
-    stmt = (
+    """High rsvp/views, recent events (global).
+
+    Prefers **upcoming** events (``end_utc >= now``). If none match—e.g. seeded
+    data is stale or the table was never filled—falls back to the same sort
+    among all approved events so clients don't get an empty feed when data exists.
+    """
+    upcoming = (
         select(Event)
         .where(Event.is_approved == True, Event.end_utc >= func.now())
         .order_by(Event.rsvp_count.desc(), Event.views_count.desc(), Event.created_at.desc())
         .offset(offset)
         .limit(limit)
     )
-    result = await session.execute(stmt)
+    result = await session.execute(upcoming)
     events = result.scalars().all()
-    return [EventListItem.model_validate(e) for e in events]
+    if events or offset > 0:
+        return [EventListItem.model_validate(e) for e in events]
+
+    # Fallback: show popular approved events (including past) when no upcoming rows
+    fallback = (
+        select(Event)
+        .where(Event.is_approved == True)
+        .order_by(Event.rsvp_count.desc(), Event.views_count.desc(), Event.created_at.desc())
+        .limit(limit)
+    )
+    result_fb = await session.execute(fallback)
+    events_fb = result_fb.scalars().all()
+    return [EventListItem.model_validate(e) for e in events_fb]
 
 
 # ---------- Search ----------

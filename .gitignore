@@ -1,5 +1,7 @@
 backend/.env
 backend/globalevents.db
+backend/test_*.db
+backend/_test_*.db
 __pycache__/
 *.pyc
 .venv/

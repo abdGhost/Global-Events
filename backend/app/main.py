@@ -5,14 +5,37 @@ import logging
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import func, select
 
 from app.config import settings
-from app.database import Base, engine
+from app.database import Base, async_session_maker, engine
+from app.models.event import Event
 from app.routers import auth, events, me_events, rsvps, chat
 
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="GlobalEvents API", version="0.1.0")
+
+
+@app.get("/api/health")
+async def health() -> dict:
+    """Lightweight check + which DB driver is in use (no secrets). Helps debug empty APIs on Render."""
+    url = settings.database_url.lower()
+    if "postgresql" in url or "postgres" in url:
+        driver = "postgresql"
+    elif "sqlite" in url:
+        driver = "sqlite"
+    else:
+        driver = "other"
+
+    async with async_session_maker() as session:
+        n = await session.scalar(select(func.count()).select_from(Event))
+
+    return {
+        "status": "ok",
+        "database_driver": driver,
+        "events_count": int(n or 0),
+    }
 
 
 @app.on_event("startup")

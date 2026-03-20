@@ -17,6 +17,7 @@ import '../../../providers/auth_providers.dart';
 import '../../../providers/current_user_provider.dart';
 import '../../../providers/my_events_providers.dart';
 import '../../../providers/saved_events_provider.dart';
+import '../../../providers/trending_events_provider.dart';
 import 'auth_card.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -85,6 +86,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       } catch (_) {}
       ref.invalidate(myCreatedEventsProvider);
       ref.invalidate(myRsvpedEventsProvider);
+      // Home feed does not depend on auth, but refresh so the shell isn’t stuck on a stale empty list.
+      ref.invalidate(trendingEventsProvider);
 
       if (mounted) {
         context.replace('/');
