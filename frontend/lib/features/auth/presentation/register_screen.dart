@@ -18,6 +18,7 @@ import '../../../providers/current_user_provider.dart';
 import '../../../providers/my_events_providers.dart';
 import '../../../providers/saved_events_provider.dart';
 import 'auth_card.dart';
+import 'auth_social_coming_soon.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({super.key});
@@ -369,7 +370,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                               children: [
                                 Expanded(
                                   child: OutlinedButton.icon(
-                                    onPressed: () => context.go('/'),
+                                    onPressed: () => showAuthProviderComingSoon(context, providerLabel: 'Google'),
                                     style: OutlinedButton.styleFrom(
                                       padding: const EdgeInsets.symmetric(vertical: 14),
                                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
@@ -383,7 +384,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                                 const SizedBox(width: 12),
                                 Expanded(
                                   child: OutlinedButton.icon(
-                                    onPressed: () => context.go('/'),
+                                    onPressed: () => showAuthProviderComingSoon(context, providerLabel: 'Apple'),
                                     style: OutlinedButton.styleFrom(
                                       padding: const EdgeInsets.symmetric(vertical: 14),
                                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
@@ -396,7 +397,16 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                                 ),
                               ],
                             ).animate().fadeIn(delay: 480.ms).slideY(begin: 0.04, end: 0),
-                            const SizedBox(height: 24),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Google & Apple — coming soon',
+                              textAlign: TextAlign.center,
+                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: Colors.grey.shade600,
+                                    fontStyle: FontStyle.italic,
+                                  ),
+                            ),
+                            const SizedBox(height: 16),
                             Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [

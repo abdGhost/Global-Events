@@ -235,15 +235,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     left: Responsive.horizontalPadding(context),
                     right: Responsive.spacing(context, 10),
                   ),
-                  child: CircleAvatar(
-                    radius: Responsive.appBarAvatarRadius(context),
-                    backgroundColor: AppColors.primary.withValues(alpha: 0.15),
-                    child: FaIcon(
-                      FontAwesomeIcons.user,
-                      color: AppColors.primary,
-                      size: Responsive.iconSize(
-                        context,
-                        Responsive.isCompact(context) ? 16 : 18,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(
+                      Responsive.appBarAvatarRadius(context),
+                    ),
+                    onTap: () => context.push('/profile'),
+                    child: CircleAvatar(
+                      radius: Responsive.appBarAvatarRadius(context),
+                      backgroundColor: AppColors.primary.withValues(alpha: 0.15),
+                      child: FaIcon(
+                        FontAwesomeIcons.user,
+                        color: AppColors.primary,
+                        size: Responsive.iconSize(
+                          context,
+                          Responsive.isCompact(context) ? 16 : 18,
+                        ),
                       ),
                     ),
                   ),
