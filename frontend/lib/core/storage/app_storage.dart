@@ -12,7 +12,19 @@ class AppStorage {
   static const _keyOnboardingCompleted = 'onboarding_completed';
   static const _keyUserLat = 'user_lat';
   static const _keyUserLng = 'user_lng';
-  static const _keySavedEvents = 'saved_events';
+  static const _keySavedEventsLegacy = 'saved_events';
+
+  /// Storage key for bookmarks (one list per logged-in email).
+  static String _savedEventsKey(String? userEmail) {
+    if (userEmail == null || userEmail.isEmpty) {
+      return _keySavedEventsLegacy;
+    }
+    final safe = userEmail
+        .toLowerCase()
+        .trim()
+        .replaceAll(RegExp(r'[^a-z0-9@._-]'), '_');
+    return 'saved_events_$safe';
+  }
 
   static Future<SharedPreferences> get _prefs async =>
       await SharedPreferences.getInstance();
@@ -62,10 +74,21 @@ class AppStorage {
     return (lat: lat, lng: lng);
   }
 
-  /// Saved events (bookmarks). Stored as JSON array of EventListItem maps.
-  static Future<List<EventListItem>> getSavedEvents() async {
+  /// Saved events (bookmarks). [userEmail] scopes list per account.
+  static Future<List<EventListItem>> getSavedEvents({String? userEmail}) async {
     final prefs = await _prefs;
-    final raw = prefs.getString(_keySavedEvents);
+    final key = _savedEventsKey(userEmail);
+    var raw = prefs.getString(key);
+    // One-time migration: copy legacy unscoped list into this user's key.
+    if ((raw == null || raw.isEmpty) &&
+        userEmail != null &&
+        userEmail.isNotEmpty) {
+      final legacy = prefs.getString(_keySavedEventsLegacy);
+      if (legacy != null && legacy.isNotEmpty) {
+        await prefs.setString(key, legacy);
+        raw = legacy;
+      }
+    }
     if (raw == null || raw.isEmpty) return [];
     try {
       final list = jsonDecode(raw) as List<dynamic>?;
@@ -78,22 +101,32 @@ class AppStorage {
     }
   }
 
-  static Future<void> setSavedEvents(List<EventListItem> items) async {
+  static Future<void> setSavedEvents(
+    List<EventListItem> items, {
+    String? userEmail,
+  }) async {
     final prefs = await _prefs;
+    final key = _savedEventsKey(userEmail);
     final list = items.map((e) => e.toJson()).toList();
-    await prefs.setString(_keySavedEvents, jsonEncode(list));
+    await prefs.setString(key, jsonEncode(list));
   }
 
-  static Future<void> addSavedEvent(EventListItem item) async {
-    final list = await getSavedEvents();
+  static Future<void> addSavedEvent(
+    EventListItem item, {
+    String? userEmail,
+  }) async {
+    final list = await getSavedEvents(userEmail: userEmail);
     if (list.any((e) => e.id == item.id)) return;
     list.insert(0, item);
-    await setSavedEvents(list);
+    await setSavedEvents(list, userEmail: userEmail);
   }
 
-  static Future<void> removeSavedEvent(String eventId) async {
-    final list = await getSavedEvents();
+  static Future<void> removeSavedEvent(
+    String eventId, {
+    String? userEmail,
+  }) async {
+    final list = await getSavedEvents(userEmail: userEmail);
     list.removeWhere((e) => e.id == eventId);
-    await setSavedEvents(list);
+    await setSavedEvents(list, userEmail: userEmail);
   }
 }

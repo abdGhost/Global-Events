@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 
 import '../constants.dart';
 import '../timezone_service.dart';
@@ -42,11 +43,11 @@ String userMessageFromDioException(DioException e) {
 
 /// Global Dio instance with base URL and X-Timezone header.
 Dio createApiClient({String? authToken}) {
-  // Render free tier cold-starts can take 50–90s; use longer timeouts for mobile.
+  // Render free tier cold-starts can exceed 90s; keep generous timeouts for APK/device.
   final dio = Dio(BaseOptions(
     baseUrl: kApiBaseUrl,
-    connectTimeout: const Duration(seconds: 90),
-    receiveTimeout: const Duration(seconds: 90),
+    connectTimeout: const Duration(seconds: 150),
+    receiveTimeout: const Duration(seconds: 150),
     headers: {
       'Accept': 'application/json',
       'Content-Type': 'application/json',
@@ -63,6 +64,37 @@ Dio createApiClient({String? authToken}) {
       // Ensure X-Timezone is always current (e.g. after app resume)
       options.headers['X-Timezone'] = TimezoneService.instance.deviceTimezone;
       handler.next(options);
+    },
+    onError: (err, handler) async {
+      // Automatic retry for transient cold-start/network failures.
+      final shouldRetry =
+          err.type == DioExceptionType.connectionError ||
+          err.type == DioExceptionType.connectionTimeout ||
+          err.type == DioExceptionType.receiveTimeout ||
+          err.type == DioExceptionType.sendTimeout ||
+          err.type == DioExceptionType.unknown;
+
+      final attempts = (err.requestOptions.extra['retry_attempt'] as int?) ?? 0;
+      if (!shouldRetry || attempts >= 2) {
+        handler.next(err);
+        return;
+      }
+
+      final nextAttempt = attempts + 1;
+      err.requestOptions.extra['retry_attempt'] = nextAttempt;
+
+      // Small progressive backoff before retry.
+      await Future<void>.delayed(Duration(seconds: nextAttempt * 2));
+
+      try {
+        final retryResponse = await dio.fetch(err.requestOptions);
+        handler.resolve(retryResponse);
+      } catch (e, st) {
+        if (kDebugMode) {
+          debugPrint('API retry #$nextAttempt failed: $e\n$st');
+        }
+        handler.next(e is DioException ? e : err);
+      }
     },
   ));
 

@@ -8,6 +8,8 @@ import '../../core/responsive/responsive.dart';
 import '../../core/storage/app_storage.dart';
 import '../../core/theme/app_colors.dart';
 import '../../providers/auth_providers.dart';
+import '../../providers/current_user_provider.dart';
+import '../../providers/saved_events_provider.dart';
 import '../../providers/user_location_provider.dart';
 import '../../providers/onboarding_provider.dart';
 
@@ -37,6 +39,13 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
       }
       if (token != null && token.isNotEmpty) {
         ref.read(authTokenProvider.notifier).state = token;
+        ref.invalidate(currentUserProvider);
+        Future.microtask(() async {
+          try {
+            final user = await ref.read(currentUserProvider.future);
+            ref.read(savedEventsProvider.notifier).setUserEmail(user.email);
+          } catch (_) {}
+        });
         context.replace('/');
         return;
       }

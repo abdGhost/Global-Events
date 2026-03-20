@@ -10,6 +10,7 @@ import '../../../core/responsive/responsive.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/picked_image_provider.dart';
 import '../../../providers/api_client_provider.dart';
+import '../../../providers/my_events_providers.dart';
 import '../../../providers/nearby_events_provider.dart';
 import '../../../providers/search_events_provider.dart';
 import '../../../providers/trending_events_provider.dart';
@@ -118,6 +119,7 @@ class _CreateEventScreenState extends ConsumerState<CreateEventScreen> {
       ref.invalidate(trendingEventsProvider);
       ref.invalidate(nearbyEventsProvider);
       ref.invalidate(searchEventsProvider);
+      ref.invalidate(myCreatedEventsProvider);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Event created')),

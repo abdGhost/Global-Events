@@ -1,15 +1,24 @@
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+import '../../../core/api/client.dart';
+import '../../../core/api/endpoints.dart';
 import '../../../core/responsive/responsive.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../models/event.dart';
+import '../../../providers/api_client_provider.dart';
+import '../../../providers/auth_providers.dart';
 import '../../../providers/event_detail_provider.dart';
+import '../../../providers/my_events_providers.dart';
+import '../../../providers/nearby_events_provider.dart';
 import '../../../providers/saved_events_provider.dart';
+import '../../../providers/search_events_provider.dart';
+import '../../../providers/trending_events_provider.dart';
 
 class EventDetailScreen extends ConsumerWidget {
   const EventDetailScreen({super.key, required this.eventId});
@@ -34,6 +43,7 @@ class EventDetailScreen extends ConsumerWidget {
             }
           };
           return _EventDetailBody(
+            ref: ref,
             event: event,
             isSaved: isSaved,
             onSaveToggle: onSaveToggle,
@@ -58,11 +68,13 @@ class EventDetailScreen extends ConsumerWidget {
 
 class _EventDetailBody extends StatelessWidget {
   const _EventDetailBody({
+    required this.ref,
     required this.event,
     required this.isSaved,
     required this.onSaveToggle,
   });
 
+  final WidgetRef ref;
   final Event event;
   final bool isSaved;
   final VoidCallback onSaveToggle;
@@ -70,6 +82,7 @@ class _EventDetailBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return _EventDetailScroll(
+      ref: ref,
       event: event,
       isSaved: isSaved,
       onSaveToggle: onSaveToggle,
@@ -79,11 +92,13 @@ class _EventDetailBody extends StatelessWidget {
 
 class _EventDetailScroll extends StatefulWidget {
   const _EventDetailScroll({
+    required this.ref,
     required this.event,
     required this.isSaved,
     required this.onSaveToggle,
   });
 
+  final WidgetRef ref;
   final Event event;
   final bool isSaved;
   final VoidCallback onSaveToggle;
@@ -95,6 +110,49 @@ class _EventDetailScroll extends StatefulWidget {
 class _EventDetailScrollState extends State<_EventDetailScroll> {
   final _scroll = ScrollController();
   bool _scrolled = false;
+  bool _rsvpBusy = false;
+
+  Future<void> _rsvp(Event e) async {
+    final token = widget.ref.read(authTokenProvider);
+    if (token == null || token.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Sign in to RSVP')),
+      );
+      context.push('/login');
+      return;
+    }
+    setState(() => _rsvpBusy = true);
+    try {
+      await widget.ref.read(apiClientProvider).post<void>(
+            Endpoints.eventRsvp(e.id),
+          );
+      widget.ref.invalidate(eventDetailProvider(e.id));
+      widget.ref.invalidate(myRsvpedEventsProvider);
+      widget.ref.invalidate(trendingEventsProvider);
+      widget.ref.invalidate(searchEventsProvider);
+      widget.ref.invalidate(nearbyEventsProvider);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("You're going — see it in Profile")),
+        );
+      }
+    } on DioException catch (err) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(userMessageFromDioException(err))),
+        );
+      }
+    } catch (err) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not RSVP: $err')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _rsvpBusy = false);
+    }
+  }
 
   @override
   void initState() {
@@ -524,7 +582,7 @@ class _EventDetailScrollState extends State<_EventDetailScroll> {
                       height: Responsive.buttonMinHeight(context),
                       width: Responsive.buttonMinHeight(context),
                       child: FilledButton(
-                        onPressed: () {},
+                        onPressed: _rsvpBusy ? null : () => _rsvp(e),
                         style: FilledButton.styleFrom(
                           backgroundColor: AppColors.primaryDark,
                           foregroundColor: Colors.white,
@@ -533,11 +591,20 @@ class _EventDetailScrollState extends State<_EventDetailScroll> {
                           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                           padding: EdgeInsets.zero,
                         ),
-                        child: FaIcon(
-                          FontAwesomeIcons.check,
-                          size: Responsive.iconSize(context, 16),
-                          color: Colors.white,
-                        ),
+                        child: _rsvpBusy
+                            ? SizedBox(
+                                width: Responsive.iconSize(context, 20),
+                                height: Responsive.iconSize(context, 20),
+                                child: const CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : FaIcon(
+                                FontAwesomeIcons.check,
+                                size: Responsive.iconSize(context, 16),
+                                color: Colors.white,
+                              ),
                       ),
                     ),
                   ],

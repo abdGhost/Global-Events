@@ -7,6 +7,7 @@ import 'package:latlong2/latlong.dart';
 import '../../../core/responsive/responsive.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../models/event.dart';
+import '../../../providers/nearby_events_provider.dart';
 import '../../../providers/search_events_provider.dart';
 import '../../../providers/user_location_provider.dart';
 
@@ -66,8 +67,29 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       }
     }
 
-    final AsyncValue<List<EventListItem>> asyncEvents =
-        ref.watch(searchEventsProvider(const SearchParams()));
+    final isNearMeFilter = _selectedFilterIndex == 3;
+    final AsyncValue<List<EventListItem>> asyncEvents = isNearMeFilter
+        ? (userLocation == null
+            ? const AsyncValue<List<EventListItem>>.data(<EventListItem>[])
+            : ref.watch(
+                nearbyEventsProvider(
+                  NearbyParams(
+                    lat: userLocation.lat,
+                    lng: userLocation.lng,
+                    radiusKm: 50,
+                    limit: 100,
+                  ),
+                ),
+              ))
+        : ref.watch(
+            searchEventsProvider(
+              const SearchParams(
+                page: 1,
+                pageSize: 100,
+                sort: 'date',
+              ),
+            ),
+          );
 
     return Scaffold(
       body: asyncEvents.when(
@@ -98,9 +120,10 @@ class _MapScreenState extends ConsumerState<MapScreen> {
             );
           }
 
-          final events = _applyFilter(
-            all.where((e) => e.lat != null && e.lng != null).toList(),
-          );
+            final withCoords =
+                all.where((e) => e.lat != null && e.lng != null).toList();
+            final events =
+                isNearMeFilter ? withCoords : _applyFilter(withCoords);
           // When there are no events with coordinates yet, still show the
           // map and header plus a friendly empty state card instead of a
           // blank screen.
@@ -124,8 +147,8 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                       markers: [
                         for (var i = 0; i < events.length; i++)
                           Marker(
-                            width: 40,
-                            height: 40,
+                            width: 120,
+                            height: 64,
                             point: LatLng(
                               events[i].lat!,
                               events[i].lng!,
@@ -302,7 +325,9 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                         ] else ...[
                           SizedBox(height: Responsive.spacing(context, 8)),
                           Text(
-                            'Create an event with a location to see it here on the map.',
+                            isNearMeFilter && userLocation == null
+                                ? 'Enable location permission to load nearby events.'
+                                : 'No map events found for this filter yet.',
                             style: Theme.of(context)
                                 .textTheme
                                 .bodySmall
@@ -357,10 +382,21 @@ class _EventMarker extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 2),
-        const Icon(
-          Icons.location_on,
-          color: AppColors.primaryDark,
-          size: 16,
+        Container(
+          width: 22,
+          height: 22,
+          decoration: BoxDecoration(
+            color: AppColors.primaryDark,
+            shape: BoxShape.circle,
+            border: Border.all(color: Colors.white, width: 1.2),
+          ),
+          child: const Center(
+            child: Icon(
+              Icons.location_on,
+              color: Colors.white,
+              size: 14,
+            ),
+          ),
         ),
       ],
     );

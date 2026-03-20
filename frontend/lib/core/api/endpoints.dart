@@ -10,10 +10,12 @@ class Endpoints {
   static const String eventsTrending = '/api/events/trending';
   static const String eventsSearch = '/api/events/search';
   static const String eventsNearby = '/api/events/nearby';
-  static const String eventsCreated = '/api/events/created';
-  static const String eventsRsvped = '/api/events/rsvped';
+  /// Prefer /api/me/... so production never treats "created" as {event_id}.
+  static const String eventsCreated = '/api/me/events/created';
+  static const String eventsRsvped = '/api/me/events/rsvped';
   static const String eventsCreate = '/api/events';
   static String eventDetail(String id) => '/api/events/$id';
+  static String eventRsvp(String id) => '/api/events/$id/rsvp';
   static String eventChatMessages(String id) => '/api/events/$id/chat/messages';
   static String eventChatWebSocket(String id) =>
       '/api/events/$id/chat/ws'; // ws path (not yet used)

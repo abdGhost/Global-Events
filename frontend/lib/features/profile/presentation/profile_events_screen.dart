@@ -59,7 +59,7 @@ class ProfileEventsScreen extends ConsumerWidget {
     final isCompact = Responsive.isCompact(context);
 
     if (type == ProfileEventsType.saved) {
-      ref.read(savedEventsProvider.notifier).loadFromStorage();
+      ref.read(savedEventsProvider.notifier).refreshFromStorage();
       final savedList = ref.watch(savedEventsProvider);
       return _buildScaffold(
         context,

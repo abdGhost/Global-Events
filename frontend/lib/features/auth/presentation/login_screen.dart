@@ -11,8 +11,12 @@ import '../../../core/api/client.dart';
 import '../../../core/api/endpoints.dart';
 import '../../../core/storage/app_storage.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/google_brand_icon.dart';
 import '../../../providers/api_client_provider.dart';
 import '../../../providers/auth_providers.dart';
+import '../../../providers/current_user_provider.dart';
+import '../../../providers/my_events_providers.dart';
+import '../../../providers/saved_events_provider.dart';
 import 'auth_card.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -74,6 +78,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
       ref.read(authTokenProvider.notifier).state = token;
       await AppStorage.saveToken(token);
+      ref.invalidate(currentUserProvider);
+      try {
+        final user = await ref.read(currentUserProvider.future);
+        ref.read(savedEventsProvider.notifier).setUserEmail(user.email);
+      } catch (_) {}
+      ref.invalidate(myCreatedEventsProvider);
+      ref.invalidate(myRsvpedEventsProvider);
 
       if (mounted) {
         context.replace('/');
@@ -327,7 +338,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                       side: BorderSide(color: Colors.grey.shade300),
                                       foregroundColor: Colors.grey.shade800,
                                     ),
-                                    icon: const FaIcon(FontAwesomeIcons.google, size: 20, color: Color(0xFF4285F4)),
+                                    icon: const GoogleBrandIcon(size: 20),
                                     label: const Text('Google'),
                                   ),
                                 ),

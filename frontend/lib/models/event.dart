@@ -54,7 +54,7 @@ class Event {
 
   factory Event.fromJson(Map<String, dynamic> json) {
     return Event(
-      id: json['id'] as String,
+      id: '${json['id']}',
       title: json['title'] as String,
       description: json['description'] as String?,
       startUtc: DateTime.parse(json['start_utc'] as String),
@@ -149,7 +149,7 @@ class EventListItem {
 
   factory EventListItem.fromJson(Map<String, dynamic> json) {
     return EventListItem(
-      id: json['id'] as String,
+      id: '${json['id']}',
       title: json['title'] as String,
       startUtc: DateTime.parse(json['start_utc'] as String),
       endUtc: DateTime.parse(json['end_utc'] as String),

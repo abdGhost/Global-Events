@@ -8,6 +8,8 @@ import '../../../core/storage/app_storage.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../providers/auth_providers.dart';
 import '../../../providers/current_user_provider.dart';
+import '../../../providers/my_events_providers.dart';
+import '../../../providers/saved_events_provider.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -22,6 +24,12 @@ class ProfileScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    ref.listen(currentUserProvider, (prev, next) {
+      next.whenData(
+        (u) => ref.read(savedEventsProvider.notifier).setUserEmail(u.email),
+      );
+    });
+
     final pad = Responsive.horizontalPadding(context);
     final isCompact = Responsive.isCompact(context);
     const darkBg = Color(0xFF121214);
@@ -118,7 +126,18 @@ class ProfileScreen extends ConsumerWidget {
                         ),
                       ),
                     ),
-                    data: (user) => SingleChildScrollView(
+                    data: (user) {
+                      final createdAsync = ref.watch(myCreatedEventsProvider);
+                      final rsvpedAsync = ref.watch(myRsvpedEventsProvider);
+                      final createdCount = createdAsync.maybeWhen(
+                        data: (l) => l.length.toString(),
+                        orElse: () => '…',
+                      );
+                      final rsvpedCount = rsvpedAsync.maybeWhen(
+                        data: (l) => l.length.toString(),
+                        orElse: () => '…',
+                      );
+                      return SingleChildScrollView(
                       padding: EdgeInsets.fromLTRB(
                         pad,
                         0,
@@ -164,9 +183,9 @@ class ProfileScreen extends ConsumerWidget {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              _StatChip(label: 'Created', value: '0'),
+                              _StatChip(label: 'Created', value: createdCount),
                               SizedBox(width: Responsive.spacing(context, 24)),
-                              _StatChip(label: 'RSVPed', value: '0'),
+                              _StatChip(label: 'RSVPed', value: rsvpedCount),
                             ],
                           ),
                           SizedBox(height: Responsive.spacing(context, 24)),
@@ -226,7 +245,8 @@ class ProfileScreen extends ConsumerWidget {
                           ),
                         ],
                       ),
-                    ),
+                    );
+                    },
                   ),
                 ),
               ],
@@ -238,7 +258,11 @@ class ProfileScreen extends ConsumerWidget {
   }
 
   static Future<void> _logout(BuildContext context, WidgetRef ref) async {
+    ref.read(savedEventsProvider.notifier).onLogout();
     ref.read(authTokenProvider.notifier).state = null;
+    ref.invalidate(currentUserProvider);
+    ref.invalidate(myCreatedEventsProvider);
+    ref.invalidate(myRsvpedEventsProvider);
     await AppStorage.saveToken(null);
     if (context.mounted) context.go('/login');
   }
