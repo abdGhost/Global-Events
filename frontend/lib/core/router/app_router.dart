@@ -1,9 +1,11 @@
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_nav_bar/google_nav_bar.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../../providers/auth_providers.dart';
 
 import '../../features/auth/presentation/login_screen.dart';
 import '../../features/auth/presentation/register_screen.dart';
@@ -26,6 +28,32 @@ GoRouter createAppRouter() {
   return GoRouter(
     navigatorKey: _rootNavigatorKey,
     initialLocation: '/splash',
+    redirect: (context, state) {
+      final container = ProviderScope.containerOf(context);
+      final token = container.read(authTokenProvider);
+      final loggedIn = token != null && token.isNotEmpty;
+      if (loggedIn) return null;
+
+      final path = state.matchedLocation;
+      if (path == '/splash' ||
+          path == '/onboarding' ||
+          path == '/login' ||
+          path == '/register') {
+        return null;
+      }
+      // Public: event detail only (not chat / RSVP flows).
+      if (path.startsWith('/event/')) {
+        final segments =
+            path.split('/').where((s) => s.isNotEmpty).toList();
+        if (segments.length >= 3 &&
+            segments.first == 'event' &&
+            segments.last == 'chat') {
+          return '/login';
+        }
+        return null;
+      }
+      return '/login';
+    },
     routes: [
       GoRoute(
         path: '/splash',

@@ -1,9 +1,12 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/api/client.dart';
+import '../../core/api/endpoints.dart';
 import '../../core/responsive/responsive.dart';
 import '../../core/storage/app_storage.dart';
 import '../../core/theme/app_colors.dart';
@@ -38,17 +41,35 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
         );
       }
       if (token != null && token.isNotEmpty) {
-        ref.read(authTokenProvider.notifier).state = token;
-        ref.invalidate(currentUserProvider);
-        Future.microtask(() async {
-          try {
-            final user = await ref.read(currentUserProvider.future);
-            ref.read(savedEventsProvider.notifier).setUserEmail(user.email);
-          } catch (_) {}
-        });
-        context.replace('/');
-        return;
+        // Verify JWT with server so stale / restored tokens (e.g. Android backup)
+        // do not skip the login screen.
+        final dio = createApiClient(authToken: token);
+        try {
+          await dio.get<Map<String, dynamic>>(Endpoints.authMe);
+          ref.read(authTokenProvider.notifier).state = token;
+          ref.invalidate(currentUserProvider);
+          Future.microtask(() async {
+            try {
+              final user = await ref.read(currentUserProvider.future);
+              ref.read(savedEventsProvider.notifier).setUserEmail(user.email);
+            } catch (_) {}
+          });
+          if (mounted) context.replace('/');
+          return;
+        } on DioException catch (e) {
+          if (e.response?.statusCode == 401) {
+            await AppStorage.saveToken(null);
+            ref.read(authTokenProvider.notifier).state = null;
+          } else {
+            // Offline or server error: keep local session so user is not locked out.
+            ref.read(authTokenProvider.notifier).state = token;
+            ref.invalidate(currentUserProvider);
+            if (mounted) context.replace('/');
+            return;
+          }
+        }
       }
+      if (!mounted) return;
       if (onboardingDone) {
         context.replace('/login');
       } else {
