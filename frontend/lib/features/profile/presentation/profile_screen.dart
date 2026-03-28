@@ -73,18 +73,6 @@ class ProfileScreen extends ConsumerWidget {
                         ),
                         onPressed: () => context.push('/create-event'),
                       ),
-                      IconButton(
-                        iconSize: Responsive.iconSize(context, 18),
-                        icon: const FaIcon(
-                          FontAwesomeIcons.gear,
-                          color: Colors.white,
-                        ),
-                        onPressed: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Settings coming soon')),
-                          );
-                        },
-                      ),
                     ],
                   ),
                 ),
